@@ -4,8 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Perfume Vault</title>
-  <script src="/_sdk/data_sdk.js"></script>
-  <script src="/_sdk/element_sdk.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
@@ -574,7 +572,68 @@
    </div>
   </div>
   <script>
-    // Catálogo de perfumes predefinidos con fotos SVG elegantes - Ordenado alfabéticamente por marca
+   (function () {
+  const STORAGE_KEY = "perfume_vault_data_v1";
+
+  function load() {
+    try {
+      return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+    } catch {
+      return [];
+    }
+  }
+
+  function save(data) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  }
+
+  // Simula el SDK que tu código ya usa: init/create/update
+  window.dataSdk = {
+    _handler: null,
+
+    async init(handler) {
+      this._handler = handler;
+      const data = load();
+      handler.onDataChanged(data);
+      return { isOk: true };
+    },
+
+    async create(record) {
+      const data = load();
+      const newRec = { ...record, id: record.id || crypto.randomUUID() };
+      data.push(newRec);
+      save(data);
+      this._handler?.onDataChanged(data);
+      return { isOk: true };
+    },
+
+    async update(record) {
+      const data = load();
+
+      // buscamos por id si existe
+      let idx = record.id ? data.findIndex(r => r.id === record.id) : -1;
+
+      // si no hay id, intentamos emparejar por claves típicas de tu app
+      if (idx === -1 && record.perfume_id) idx = data.findIndex(r => r.perfume_id === record.perfume_id);
+      if (idx === -1 && record.friend_id) idx = data.findIndex(r => r.friend_id === record.friend_id);
+      if (idx === -1 && record.profile_username) idx = data.findIndex(r => r.profile_username);
+
+      if (idx >= 0) data[idx] = { ...data[idx], ...record };
+      else data.push({ ...record, id: record.id || crypto.randomUUID() });
+
+      save(data);
+      this._handler?.onDataChanged(data);
+      return { isOk: true };
+    }
+  };
+
+  // Por si tu código mira elementSdk (lo dejamos como “no-op”)
+  window.elementSdk = {
+    init() {},
+    setConfig() {}
+  };
+})();
+    
     const PERFUME_CATALOG = [
       // ACQUA DI PARMA
       { id: 'acqua-colonia', brand: 'ACQUA DI PARMA', name: 'Colonia', svg: createBottleSVG('#ca8a04', '#fbbf24'), color: 'from-yellow-700 to-amber-800' },
@@ -1854,6 +1913,6 @@
 
     initializeApp();
   </script>
- <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9c6065fdf0a7a431',t:'MTc2OTc3MDEyMi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 
 </html>
+
