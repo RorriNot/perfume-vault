@@ -1,0 +1,1848 @@
+<!doctype html>
+<html lang="es" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Perfume Vault</title>
+  <script src="/_sdk/data_sdk.js"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&amp;family=Barlow:wght@300;400;500;600&amp;display=swap" rel="stylesheet">
+  <style>
+    body {
+      box-sizing: border-box;
+    }
+    
+    * {
+      font-family: 'Barlow', system-ui, -apple-system, sans-serif;
+    }
+    
+    h1, h2, h3 {
+      font-family: 'Rajdhani', sans-serif;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+    
+    .sidebar {
+      position: fixed;
+      top: 0;
+      left: -300px;
+      width: 300px;
+      height: 100%;
+      background: #0f0f0f;
+      transition: left 0.3s ease;
+      z-index: 1000;
+      border-right: 1px solid #333;
+    }
+    
+    .sidebar.open {
+      left: 0;
+    }
+    
+    .overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 999;
+      display: none;
+    }
+    
+    .overlay.active {
+      display: block;
+    }
+    
+    .perfume-item {
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .perfume-item:hover {
+      transform: translateY(-8px);
+      box-shadow: 0 15px 40px rgba(217, 70, 239, 0.4);
+    }
+    
+    .perfume-item.owned::after {
+      content: '✓';
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      color: white;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 16px;
+    }
+    
+    .perfume-item.wishlist::after {
+      content: '★';
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      color: white;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 16px;
+    }
+    
+    .perfume-item.fake::before {
+      content: '⚠';
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      color: white;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 16px;
+      z-index: 10;
+    }
+    
+    .star {
+      cursor: pointer;
+      font-size: 28px;
+      color: #374151;
+      transition: color 0.2s;
+    }
+    
+    .star.filled {
+      color: #fbbf24;
+    }
+    
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.9);
+      z-index: 2000;
+      overflow-y: auto;
+    }
+    
+    .modal.active {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    
+    .loading-spinner {
+      border: 3px solid rgba(255,255,255,0.3);
+      border-radius: 50%;
+      border-top: 3px solid #d946ef;
+      width: 20px;
+      height: 20px;
+      animation: spin 1s linear infinite;
+      display: inline-block;
+      margin-left: 8px;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #10b981;
+      color: white;
+      padding: 16px 24px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      z-index: 3000;
+      animation: slideIn 0.3s ease-out;
+      font-weight: 500;
+    }
+    
+    @keyframes slideIn {
+      from {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+    
+    .gradient-border {
+      border: 2px solid transparent;
+      background: linear-gradient(#1a1a1a, #1a1a1a) padding-box,
+                  linear-gradient(135deg, #d946ef, #9333ea) border-box;
+    }
+  </style>
+  <style>@view-transition { navigation: auto; }</style>
+ </head>
+ <body class="h-full">
+  <div id="app" class="h-full w-full" style="background: #0a0a0a;"><!-- Sidebar -->
+   <div id="sidebar" class="sidebar">
+    <div class="p-6"><button id="close-menu" class="text-gray-400 hover:text-white mb-8 text-2xl">✕</button>
+     <nav class="space-y-2"><button class="menu-item w-full text-left px-4 py-3 rounded-lg text-white font-semibold hover:bg-gray-800 transition-colors flex items-center space-x-3" data-view="catalog"> <span class="text-xl">🏠</span> <span>CATÁLOGO COMPLETO</span> </button> <button class="menu-item w-full text-left px-4 py-3 rounded-lg text-gray-400 font-semibold hover:bg-gray-800 hover:text-white transition-colors flex items-center space-x-3" data-view="collection"> <span class="text-xl">💎</span> <span>MI COLECCIÓN</span> </button> <button class="menu-item w-full text-left px-4 py-3 rounded-lg text-gray-400 font-semibold hover:bg-gray-800 hover:text-white transition-colors flex items-center space-x-3" data-view="wishlist"> <span class="text-xl">⭐</span> <span>LISTA DE DESEOS</span> </button> <button class="menu-item w-full text-left px-4 py-3 rounded-lg text-gray-400 font-semibold hover:bg-gray-800 hover:text-white transition-colors flex items-center space-x-3" data-view="community"> <span class="text-xl">👥</span> <span>AMIGOS</span> </button> <button class="menu-item w-full text-left px-4 py-3 rounded-lg text-gray-400 font-semibold hover:bg-gray-800 hover:text-white transition-colors flex items-center space-x-3" data-view="news"> <span class="text-xl">📰</span> <span>NOTICIAS</span> </button> <button class="menu-item w-full text-left px-4 py-3 rounded-lg text-gray-400 font-semibold hover:bg-gray-800 hover:text-white transition-colors flex items-center space-x-3" data-view="profile"> <span class="text-xl">👤</span> <span>MI PERFIL</span> </button>
+     </nav>
+     <div class="mt-8 pt-8 border-t border-gray-800">
+      <div class="text-gray-500 text-sm mb-3 font-semibold">
+       ESTADÍSTICAS
+      </div>
+      <div class="space-y-2 text-sm">
+       <div class="flex justify-between text-gray-400"><span>Colección:</span> <span id="sidebar-stat-owned" class="text-green-400 font-semibold">0</span>
+       </div>
+       <div class="flex justify-between text-gray-400"><span>Deseos:</span> <span id="sidebar-stat-wishlist" class="text-amber-400 font-semibold">0</span>
+       </div>
+       <div class="flex justify-between text-gray-400"><span>Falsificaciones:</span> <span id="sidebar-stat-fake" class="text-red-400 font-semibold">0</span>
+       </div>
+      </div>
+     </div>
+    </div>
+   </div><!-- Overlay -->
+   <div id="overlay" class="overlay"></div><!-- Main Content -->
+   <div class="h-full w-full overflow-auto"><!-- Header -->
+    <header class="sticky top-0 z-50" style="background: rgba(10, 10, 10, 0.95); backdrop-filter: blur(10px); border-bottom: 1px solid #1f1f1f;">
+     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <div class="flex items-center justify-between">
+       <div class="flex items-center space-x-4"><button id="menu-btn" class="text-white hover:text-purple-400 transition-colors">
+         <svg class="w-8 h-8" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+         </svg></button>
+        <h1 id="app-title" class="text-2xl md:text-3xl font-bold text-white">PERFUME VAULT</h1>
+       </div>
+       <div class="flex items-center space-x-4">
+        <div class="hidden md:flex items-center space-x-6 text-sm">
+         <div class="text-gray-400"><span class="text-green-400 font-bold" id="header-stat-owned">0</span> Colección
+         </div>
+         <div class="text-gray-400"><span class="text-amber-400 font-bold" id="header-stat-wishlist">0</span> Deseos
+         </div>
+        </div>
+       </div>
+      </div>
+     </div>
+    </header>
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8"><!-- Catalog View (Default) -->
+     <div id="catalog-view" class="view-content">
+      <div class="mb-8">
+       <h2 class="text-3xl font-bold text-white mb-2">CATÁLOGO DE PERFUMES</h2>
+       <p class="text-gray-400">Explora y añade perfumes a tu colección</p>
+      </div>
+      <div id="catalog-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"><!-- Catalog items will be rendered here -->
+      </div>
+     </div><!-- Collection View -->
+     <div id="collection-view" class="view-content hidden">
+      <div class="mb-8">
+       <h2 class="text-3xl font-bold text-white mb-2">MI COLECCIÓN</h2>
+       <p class="text-gray-400">Los perfumes que posees</p>
+      </div>
+      <div id="collection-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"><!-- Collection items will be rendered here -->
+      </div>
+      <div id="collection-empty" class="text-center py-20 hidden">
+       <div class="text-6xl mb-4">
+        💎
+       </div>
+       <h3 class="text-2xl font-bold text-white mb-2">Tu colección est   vacía</h3>
+       <p class="text-gray-500">Explora el catálogo y añade tus primeros perfumes</p>
+      </div>
+     </div><!-- Wishlist View -->
+     <div id="wishlist-view" class="view-content hidden">
+      <div class="mb-8">
+       <h2 class="text-3xl font-bold text-white mb-2">LISTA DE DESEOS</h2>
+       <p class="text-gray-400">Perfumes que quieres conseguir</p>
+      </div>
+      <div id="wishlist-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"><!-- Wishlist items will be rendered here -->
+      </div>
+      <div id="wishlist-empty" class="text-center py-20 hidden">
+       <div class="text-6xl mb-4">
+        ⭐
+       </div>
+       <h3 class="text-2xl font-bold text-white mb-2">Lista de deseos vacía</h3>
+       <p class="text-gray-500">Marca los perfumes que deseas en el catálogo</p>
+      </div>
+     </div><!-- Community View -->
+     <div id="community-view" class="view-content hidden">
+      <div class="mb-8">
+       <h2 class="text-3xl font-bold text-white mb-2">COMUNIDAD</h2>
+       <p class="text-gray-400">Conecta con otros coleccionistas</p>
+      </div><!-- Search Bar -->
+      <div class="mb-8">
+       <div class="relative"><input type="text" id="friend-search" placeholder="Buscar coleccionistas por nombre..." class="w-full px-6 py-4 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:outline-none text-lg" style="background: #1a1a1a; border: 2px solid #333;">
+        <div class="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-500 text-2xl">
+         🔍
+        </div>
+       </div>
+      </div><!-- Friends Grid -->
+      <div id="friends-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"><!-- Friends will be rendered here -->
+      </div>
+     </div><!-- Profile View -->
+     <div id="profile-view" class="view-content hidden">
+      <div class="mb-8">
+       <h2 class="text-3xl font-bold text-white mb-2">MI PERFIL</h2>
+       <p class="text-gray-400">Personaliza tu perfil y gestiona tu comunidad</p>
+      </div>
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6"><!-- Profile Card -->
+       <div class="lg:col-span-1">
+        <div class="gradient-border rounded-lg p-6" style="background: #1a1a1a;">
+         <div class="text-center mb-6">
+          <div id="profile-avatar-display" class="w-32 h-32 mx-auto bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center text-5xl mb-4">
+           👤
+          </div>
+          <h3 id="profile-username-display" class="text-white font-bold text-2xl mb-2">@mi_usuario</h3>
+          <p id="profile-bio-display" class="text-gray-400 text-sm mb-4">Coleccionista de perfumes</p>
+          <div id="profile-privacy-badge" class="inline-block px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-xs font-bold">
+           🌍 CUENTA PÚBLICA
+          </div>
+         </div>
+         <div class="grid grid-cols-3 gap-4 mb-6 text-center">
+          <div>
+           <div id="profile-stat-perfumes" class="text-white font-bold text-2xl">
+            0
+           </div>
+           <div class="text-gray-500 text-xs">
+            Perfumes
+           </div>
+          </div>
+          <div>
+           <div id="profile-stat-following" class="text-white font-bold text-2xl">
+            0
+           </div>
+           <div class="text-gray-500 text-xs">
+            Siguiendo
+           </div>
+          </div>
+          <div>
+           <div id="profile-stat-followers" class="text-white font-bold text-2xl">
+            0
+           </div>
+           <div class="text-gray-500 text-xs">
+            Seguidores
+           </div>
+          </div>
+         </div><button id="edit-profile-btn" class="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 rounded-lg font-bold hover:from-purple-700 hover:to-pink-700 transition-all"> EDITAR PERFIL </button>
+        </div>
+       </div><!-- Social Tabs -->
+       <div class="lg:col-span-2">
+        <div class="gradient-border rounded-lg p-6" style="background: #1a1a1a;">
+         <div class="flex space-x-2 mb-6 border-b border-gray-800"><button class="profile-social-tab px-6 py-3 font-bold text-white border-b-2 border-purple-500" data-tab="following"> SIGUIENDO </button> <button class="profile-social-tab px-6 py-3 font-bold text-gray-500 hover:text-white transition-colors" data-tab="followers"> SEGUIDORES </button>
+         </div><!-- Following Tab -->
+         <div id="following-tab" class="profile-social-content">
+          <div id="following-list" class="space-y-3"><!-- Following list will be rendered here -->
+          </div>
+          <div id="following-empty" class="text-center py-20 hidden">
+           <div class="text-6xl mb-4">
+            👥
+           </div>
+           <h3 class="text-2xl font-bold text-white mb-2">No sigues a nadie</h3>
+           <p class="text-gray-500">Explora la comunidad y conecta con otros coleccionistas</p>
+          </div>
+         </div><!-- Followers Tab -->
+         <div id="followers-tab" class="profile-social-content hidden">
+          <div id="followers-list" class="space-y-3"><!-- Followers list will be rendered here -->
+          </div>
+          <div id="followers-empty" class="text-center py-20 hidden">
+           <div class="text-6xl mb-4">
+            👥
+           </div>
+           <h3 class="text-2xl font-bold text-white mb-2">Aún no tienes seguidores</h3>
+           <p class="text-gray-500">Comparte tu perfil para que otros coleccionistas te descubran</p>
+          </div>
+         </div>
+        </div>
+       </div>
+      </div>
+     </div><!-- News View -->
+     <div id="news-view" class="view-content hidden">
+      <div class="mb-8">
+       <h2 id="news-title" class="text-3xl font-bold text-white mb-2">LANZAMIENTOS EXCLUSIVOS</h2>
+       <p class="text-gray-400">Próximos lanzamientos 2024</p>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+       <div class="gradient-border rounded-lg overflow-hidden hover:shadow-lg hover:shadow-purple-500/30 transition-all">
+        <div class="h-56 bg-gradient-to-br from-rose-900 to-pink-900 flex items-center justify-center">
+         <div class="text-7xl">
+          🌹
+         </div>
+        </div>
+        <div class="p-6" style="background: #1a1a1a;">
+         <div class="inline-block px-3 py-1 bg-red-500/20 text-red-400 rounded-full text-xs font-bold mb-3">
+          MARZO 2024
+         </div>
+         <h3 class="text-white font-bold text-xl mb-2">DIOR - ROSE ÉTERNELLE</h3>
+         <p class="text-gray-400 text-sm">Rosa búlgara con bergamota y ámbar blanco. Edición limitada premium.</p>
+        </div>
+       </div>
+       <div class="gradient-border rounded-lg overflow-hidden hover:shadow-lg hover:shadow-purple-500/30 transition-all">
+        <div class="h-56 bg-gradient-to-br from-blue-900 to-indigo-900 flex items-center justify-center">
+         <div class="text-7xl">
+          🌊
+         </div>
+        </div>
+        <div class="p-6" style="background: #1a1a1a;">
+         <div class="inline-block px-3 py-1 bg-blue-500/20 text-blue-400 rounded-full text-xs font-bold mb-3">
+          ABRIL 2024
+         </div>
+         <h3 class="text-white font-bold text-xl mb-2">CHANEL - OCÉAN PROFOND</h3>
+         <p class="text-gray-400 text-sm">Fragancia marina con cedro y bergamota. Inspirada en la costa francesa.</p>
+        </div>
+       </div>
+       <div class="gradient-border rounded-lg overflow-hidden hover:shadow-lg hover:shadow-purple-500/30 transition-all">
+        <div class="h-56 bg-gradient-to-br from-amber-900 to-orange-900 flex items-center justify-center">
+         <div class="text-7xl">
+          🍊
+         </div>
+        </div>
+        <div class="p-6" style="background: #1a1a1a;">
+         <div class="inline-block px-3 py-1 bg-orange-500/20 text-orange-400 rounded-full text-xs font-bold mb-3">
+          MAYO 2024
+         </div>
+         <h3 class="text-white font-bold text-xl mb-2">HERMÈS - CITRUS GARDEN</h3>
+         <p class="text-gray-400 text-sm">Cítricos vibrantes con notas florales y madera de sándalo.</p>
+        </div>
+       </div>
+       <div class="gradient-border rounded-lg overflow-hidden hover:shadow-lg hover:shadow-purple-500/30 transition-all">
+        <div class="h-56 bg-gradient-to-br from-purple-900 to-violet-900 flex items-center justify-center">
+         <div class="text-7xl">
+          💜
+         </div>
+        </div>
+        <div class="p-6" style="background: #1a1a1a;">
+         <div class="inline-block px-3 py-1 bg-purple-500/20 text-purple-400 rounded-full text-xs font-bold mb-3">
+          JUNIO 2024
+         </div>
+         <h3 class="text-white font-bold text-xl mb-2">TOM FORD - VELVET NOIR</h3>
+         <p class="text-gray-400 text-sm">Oriental intenso con iris, vainilla y pachulí. Exclusivo en boutiques.</p>
+        </div>
+       </div>
+      </div>
+     </div>
+    </main>
+   </div>
+  </div><!-- Edit Profile Modal -->
+  <div id="edit-profile-modal" class="modal">
+   <div class="gradient-border rounded-lg w-full max-w-2xl" style="background: #1a1a1a;">
+    <div class="p-8">
+     <div class="flex justify-between items-start mb-6">
+      <h3 class="text-white font-bold text-3xl">EDITAR PERFIL</h3><button id="close-edit-profile" class="text-gray-400 hover:text-white text-3xl">✕</button>
+     </div>
+     <div class="space-y-6"><!-- Avatar Selection -->
+      <div><label class="block text-gray-400 text-sm font-semibold mb-3">AVATAR</label>
+       <div class="grid grid-cols-6 gap-3" id="avatar-grid"><button class="avatar-option w-14 h-14 rounded-full flex items-center justify-center text-2xl hover:scale-110 transition-transform border-2 border-transparent" data-avatar="👤" data-gradient="from-purple-600 to-pink-600">👤</button> <button class="avatar-option w-14 h-14 rounded-full flex items-center justify-center text-2xl hover:scale-110 transition-transform border-2 border-transparent" data-avatar="😎" data-gradient="from-blue-600 to-cyan-600">😎</button> <button class="avatar-option w-14 h-14 rounded-full flex items-center justify-center text-2xl hover:scale-110 transition-transform border-2 border-transparent" data-avatar="🌟" data-gradient="from-yellow-600 to-amber-600">🌟</button> <button class="avatar-option w-14 h-14 rounded-full flex items-center justify-center text-2xl hover:scale-110 transition-transform border-2 border-transparent" data-avatar="💎" data-gradient="from-emerald-600 to-teal-600">💎</button> <button class="avatar-option w-14 h-14 rounded-full flex items-center justify-center text-2xl hover:scale-110 transition-transform border-2 border-transparent" data-avatar="🔥" data-gradient="from-red-600 to-orange-600">🔥</button> <button class="avatar-option w-14 h-14 rounded-full flex items-center justify-center text-2xl hover:scale-110 transition-transform border-2 border-transparent" data-avatar="⚡" data-gradient="from-indigo-600 to-purple-600">⚡</button> <button class="avatar-option w-14 h-14 rounded-full flex items-center justify-center text-2xl hover:scale-110 transition-transform border-2 border-transparent" data-avatar="🎭" data-gradient="from-pink-600 to-rose-600">🎭</button> <button class="avatar-option w-14 h-14 rounded-full flex items-center justify-center text-2xl hover:scale-110 transition-transform border-2 border-transparent" data-avatar="🌊" data-gradient="from-cyan-600 to-blue-600">🌊</button> <button class="avatar-option w-14 h-14 rounded-full flex items-center justify-center text-2xl hover:scale-110 transition-transform border-2 border-transparent" data-avatar="🌙" data-gradient="from-slate-600 to-gray-600">🌙</button> <button class="avatar-option w-14 h-14 rounded-full flex items-center justify-center text-2xl hover:scale-110 transition-transform border-2 border-transparent" data-avatar="☀️" data-gradient="from-orange-600 to-yellow-600">☀️</button> <button class="avatar-option w-14 h-14 rounded-full flex items-center justify-center text-2xl hover:scale-110 transition-transform border-2 border-transparent" data-avatar="🎨" data-gradient="from-violet-600 to-fuchsia-600">🎨</button> <button class="avatar-option w-14 h-14 rounded-full flex items-center justify-center text-2xl hover:scale-110 transition-transform border-2 border-transparent" data-avatar="🏆" data-gradient="from-amber-600 to-yellow-600">🏆</button>
+       </div>
+      </div><!-- Username -->
+      <div><label class="block text-gray-400 text-sm font-semibold mb-2">NOMBRE DE USUARIO</label> <input type="text" id="edit-username" placeholder="@mi_usuario" maxlength="20" class="w-full px-4 py-3 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:outline-none" style="background: #0f0f0f; border: 1px solid #333;">
+      </div><!-- Bio -->
+      <div><label class="block text-gray-400 text-sm font-semibold mb-2">BIOGRAFÍA</label> <textarea id="edit-bio" rows="3" maxlength="100" placeholder="Cuéntanos sobre ti..." class="w-full px-4 py-3 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:outline-none" style="background: #0f0f0f; border: 1px solid #333;"></textarea>
+       <div class="text-gray-500 text-xs mt-1 text-right" id="bio-counter">
+        0/100
+       </div>
+      </div><!-- Privacy Toggle -->
+      <div><label class="block text-gray-400 text-sm font-semibold mb-3">PRIVACIDAD</label>
+       <div class="flex items-center justify-between p-4 rounded-lg" style="background: #0f0f0f; border: 1px solid #333;">
+        <div>
+         <div class="text-white font-semibold">
+          Cuenta Pública
+         </div>
+         <div class="text-gray-500 text-xs">
+          Cualquiera puede ver tu perfil y colección
+         </div>
+        </div><label class="relative inline-flex items-center cursor-pointer"> <input type="checkbox" id="privacy-toggle" class="sr-only peer" checked>
+         <div class="w-14 h-7 bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-gradient-to-r peer-checked:from-purple-600 peer-checked:to-pink-600"></div></label>
+       </div>
+      </div>
+     </div><button id="save-profile-btn" class="w-full mt-6 bg-gradient-to-r from-purple-600 to-pink-600 text-white py-4 rounded-lg font-bold text-lg hover:from-purple-700 hover:to-pink-700 transition-all"> GUARDAR CAMBIOS </button>
+    </div>
+   </div>
+  </div><!-- Friend Profile Modal -->
+  <div id="friend-profile-modal" class="modal">
+   <div class="gradient-border rounded-lg w-full max-w-5xl" style="background: #1a1a1a; max-height: 90vh; overflow-y: auto;">
+    <div class="p-8">
+     <div class="flex justify-between items-start mb-6">
+      <div class="flex items-center space-x-4">
+       <div id="friend-profile-avatar" class="w-20 h-20 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center text-3xl">
+        👤
+       </div>
+       <div>
+        <h3 id="friend-profile-name" class="text-white font-bold text-3xl">@username</h3>
+        <p id="friend-profile-bio" class="text-gray-400 text-lg">Coleccionista</p>
+        <div class="flex space-x-6 mt-2 text-sm"><span class="text-gray-400"><span id="friend-profile-owned" class="text-green-400 font-bold">0</span> Colección</span> <span class="text-gray-400"><span id="friend-profile-wishlist" class="text-amber-400 font-bold">0</span> Deseos</span>
+        </div>
+       </div>
+      </div><button id="close-friend-profile" class="text-gray-400 hover:text-white text-3xl">✕</button>
+     </div>
+     <div class="mb-6"><button id="toggle-follow-btn" class="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-8 py-3 rounded-lg font-bold hover:from-purple-700 hover:to-pink-700 transition-all"> SEGUIR </button>
+     </div><!-- Tabs -->
+     <div class="flex space-x-2 mb-6 border-b border-gray-800"><button class="friend-tab px-6 py-3 font-bold text-white border-b-2 border-purple-500" data-tab="collection"> COLECCIÓN </button> <button class="friend-tab px-6 py-3 font-bold text-gray-500 hover:text-white transition-colors" data-tab="wishlist"> LISTA DE DESEOS </button>
+     </div><!-- Friend Collection -->
+     <div id="friend-collection-tab" class="friend-tab-content">
+      <div id="friend-collection-grid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4"><!-- Friend collection will be rendered here -->
+      </div>
+      <div id="friend-collection-empty" class="text-center py-20 hidden">
+       <div class="text-6xl mb-4">
+        💎
+       </div>
+       <h3 class="text-2xl font-bold text-white mb-2">Colección vacía</h3>
+       <p class="text-gray-500">Este usuario aún no ha añadido perfumes</p>
+      </div>
+     </div><!-- Friend Wishlist -->
+     <div id="friend-wishlist-tab" class="friend-tab-content hidden">
+      <div id="friend-wishlist-grid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4"><!-- Friend wishlist will be rendered here -->
+      </div>
+      <div id="friend-wishlist-empty" class="text-center py-20 hidden">
+       <div class="text-6xl mb-4">
+        ⭐
+       </div>
+       <h3 class="text-2xl font-bold text-white mb-2">Lista de deseos vacía</h3>
+       <p class="text-gray-500">Este usuario aún no tiene perfumes en su lista de deseos</p>
+      </div>
+     </div>
+    </div>
+   </div>
+  </div><!-- Perfume Detail Modal -->
+  <div id="detail-modal" class="modal">
+   <div class="gradient-border rounded-lg w-full max-w-2xl" style="background: #1a1a1a;">
+    <div class="p-8">
+     <div class="flex justify-between items-start mb-6">
+      <div>
+       <h3 id="detail-brand" class="text-white font-bold text-3xl mb-2">BRAND</h3>
+       <p id="detail-name" class="text-gray-400 text-xl">Perfume Name</p>
+      </div><button id="close-detail" class="text-gray-400 hover:text-white text-3xl">✕</button>
+     </div>
+     <div id="detail-image" class="w-full h-64 rounded-lg mb-6 flex items-center justify-center text-6xl" style="background: linear-gradient(135deg, #1f1f1f, #2a2a2a);"><!-- Image or icon here -->
+     </div>
+     <div class="space-y-4 mb-6">
+      <div><label class="block text-gray-400 text-sm font-semibold mb-2">VALORACIÓN</label>
+       <div id="detail-rating-stars" class="flex space-x-2"><span class="star" data-rating="1">★</span> <span class="star" data-rating="2">★</span> <span class="star" data-rating="3">★</span> <span class="star" data-rating="4">★</span> <span class="star" data-rating="5">★</span>
+       </div>
+      </div>
+      <div><label class="block text-gray-400 text-sm font-semibold mb-2">TU REVIEW</label> <textarea id="detail-review" rows="4" class="w-full px-4 py-3 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:outline-none" style="background: #0f0f0f; border: 1px solid #333;" placeholder="Escribe tu opinión sobre este perfume..."></textarea>
+      </div>
+     </div>
+     <div class="grid grid-cols-3 gap-3 mb-6"><label id="detail-owned-btn" class="cursor-pointer"> <input type="checkbox" id="detail-owned" class="hidden">
+       <div class="text-center py-3 rounded-lg font-semibold transition-all" style="background: #0f0f0f; border: 2px solid #333; color: #888;">
+        <div class="text-2xl mb-1">
+         ✓
+        </div>
+        <div class="text-xs">
+         LO TENGO
+        </div>
+       </div></label> <label id="detail-wishlist-btn" class="cursor-pointer"> <input type="checkbox" id="detail-wishlist" class="hidden">
+       <div class="text-center py-3 rounded-lg font-semibold transition-all" style="background: #0f0f0f; border: 2px solid #333; color: #888;">
+        <div class="text-2xl mb-1">
+         ★
+        </div>
+        <div class="text-xs">
+         LO QUIERO
+        </div>
+       </div></label> <label id="detail-fake-btn" class="cursor-pointer"> <input type="checkbox" id="detail-fake" class="hidden">
+       <div class="text-center py-3 rounded-lg font-semibold transition-all" style="background: #0f0f0f; border: 2px solid #333; color: #888;">
+        <div class="text-2xl mb-1">
+         ⚠
+        </div>
+        <div class="text-xs">
+         ES FALSO
+        </div>
+       </div></label>
+     </div><button id="save-detail-btn" class="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-4 rounded-lg font-bold text-lg hover:from-purple-700 hover:to-pink-700 transition-all"> GUARDAR CAMBIOS </button>
+    </div>
+   </div>
+  </div>
+  <script>
+    // Catálogo de perfumes predefinidos con fotos SVG elegantes - Ordenado alfabéticamente por marca
+    const PERFUME_CATALOG = [
+      // ACQUA DI PARMA
+      { id: 'acqua-colonia', brand: 'ACQUA DI PARMA', name: 'Colonia', svg: createBottleSVG('#ca8a04', '#fbbf24'), color: 'from-yellow-700 to-amber-800' },
+      { id: 'acqua-essenza', brand: 'ACQUA DI PARMA', name: 'Colonia Essenza', svg: createBottleSVG('#0e7490', '#22d3ee'), color: 'from-cyan-800 to-blue-700' },
+      
+      // ARMANI
+      { id: 'armani-acqua', brand: 'ARMANI', name: 'Acqua di Gio Profumo', svg: createBottleSVG('#0c4a6e', '#0ea5e9'), color: 'from-blue-900 to-cyan-800' },
+      { id: 'armani-acqua-absolu', brand: 'ARMANI', name: 'Acqua di Gio Absolu', svg: createBottleSVG('#1e3a8a', '#3b82f6'), color: 'from-blue-900 to-indigo-800' },
+      { id: 'armani-code', brand: 'ARMANI', name: 'Code Profumo', svg: createBottleSVG('#92400e', '#d97706'), color: 'from-amber-900 to-orange-900' },
+      { id: 'armani-code-absolu', brand: 'ARMANI', name: 'Code Absolu', svg: createBottleSVG('#78350f', '#ca8a04'), color: 'from-amber-900 to-yellow-700' },
+      { id: 'armani-stronger', brand: 'ARMANI', name: 'Stronger With You', svg: createBottleSVG('#7c2d12', '#ea580c'), color: 'from-orange-900 to-red-800' },
+      { id: 'armani-stronger-intensely', brand: 'ARMANI', name: 'Stronger With You Intensely', svg: createBottleSVG('#991b1b', '#dc2626'), color: 'from-red-900 to-orange-800' },
+      { id: 'armani-stronger-absolute', brand: 'ARMANI', name: 'Stronger With You Absolutely', svg: createBottleSVG('#831843', '#be185d'), color: 'from-pink-900 to-rose-800' },
+      
+      // BVLGARI
+      { id: 'bvlgari-man', brand: 'BVLGARI', name: 'Man in Black', svg: createBottleSVG('#0f172a', '#334155'), color: 'from-black to-gray-800' },
+      { id: 'bvlgari-aqva', brand: 'BVLGARI', name: 'Aqva Pour Homme', svg: createBottleSVG('#0e7490', '#06b6d4'), color: 'from-cyan-900 to-teal-700' },
+      { id: 'bvlgari-extreme', brand: 'BVLGARI', name: 'Man Extreme', svg: createBottleSVG('#1e3a8a', '#3b82f6'), color: 'from-blue-900 to-indigo-800' },
+      
+      // BURBERRY
+      { id: 'burberry-london', brand: 'BURBERRY', name: 'London for Men', svg: createBottleSVG('#991b1b', '#dc2626'), color: 'from-red-800 to-amber-900' },
+      { id: 'burberry-brit', brand: 'BURBERRY', name: 'Brit Rhythm', svg: createBottleSVG('#1f2937', '#6b7280'), color: 'from-gray-900 to-slate-700' },
+      { id: 'burberry-hero', brand: 'BURBERRY', name: 'Hero', svg: createBottleSVG('#92400e', '#f59e0b'), color: 'from-amber-900 to-yellow-700' },
+      
+      // CALVIN KLEIN
+      { id: 'ck-one', brand: 'CALVIN KLEIN', name: 'CK One', svg: createBottleSVG('#64748b', '#94a3b8'), color: 'from-slate-600 to-gray-400' },
+      { id: 'ck-eternity', brand: 'CALVIN KLEIN', name: 'Eternity for Men', svg: createBottleSVG('#0c4a6e', '#0284c7'), color: 'from-blue-900 to-sky-700' },
+      { id: 'ck-obsession', brand: 'CALVIN KLEIN', name: 'Obsession', svg: createBottleSVG('#78350f', '#d97706'), color: 'from-amber-900 to-orange-700' },
+      
+      // CAROLINA HERRERA
+      { id: 'carolina-bad', brand: 'CAROLINA HERRERA', name: 'Bad Boy', svg: createBottleSVG('#000000', '#7f1d1d'), color: 'from-black to-red-900' },
+      { id: 'carolina-212', brand: 'CAROLINA HERRERA', name: '212 VIP Men', svg: createBottleSVG('#6b7280', '#94a3b8'), color: 'from-gray-700 to-slate-500' },
+      { id: 'carolina-chic', brand: 'CAROLINA HERRERA', name: 'CH Men', svg: createBottleSVG('#7c2d12', '#ea580c'), color: 'from-orange-900 to-amber-700' },
+      
+      // CHANEL
+      { id: 'chanel-allure', brand: 'CHANEL', name: 'Allure Homme', svg: createBottleSVG('#334155', '#94a3b8'), color: 'from-slate-800 to-gray-500' },
+      { id: 'chanel-allure-sport', brand: 'CHANEL', name: 'Allure Homme Sport', svg: createBottleSVG('#0c4a6e', '#38bdf8'), color: 'from-blue-900 to-cyan-600' },
+      { id: 'chanel-allure-extreme', brand: 'CHANEL', name: 'Allure Homme Sport Eau Extrême', svg: createBottleSVG('#0e7490', '#22d3ee'), color: 'from-cyan-800 to-sky-400' },
+      { id: 'chanel-bleu', brand: 'CHANEL', name: 'Bleu de Chanel', svg: createBottleSVG('#1e40af', '#60a5fa'), color: 'from-blue-800 to-indigo-900' },
+      { id: 'chanel-bleu-parfum', brand: 'CHANEL', name: 'Bleu de Chanel Parfum', svg: createBottleSVG('#1e3a8a', '#3b82f6'), color: 'from-blue-900 to-indigo-800' },
+      { id: 'chanel-platinum', brand: 'CHANEL', name: 'Égoïste Platinum', svg: createBottleSVG('#475569', '#cbd5e1'), color: 'from-slate-700 to-gray-300' },
+      
+      // CREED
+      { id: 'creed-aventus', brand: 'CREED', name: 'Aventus', svg: createBottleSVG('#065f46', '#10b981'), color: 'from-emerald-900 to-teal-900' },
+      { id: 'creed-millesime', brand: 'CREED', name: 'Millésime Impérial', svg: createBottleSVG('#0c4a6e', '#06b6d4'), color: 'from-blue-900 to-cyan-700' },
+      { id: 'creed-silver', brand: 'CREED', name: 'Silver Mountain Water', svg: createBottleSVG('#0e7490', '#67e8f9'), color: 'from-cyan-800 to-sky-400' },
+      { id: 'creed-viking', brand: 'CREED', name: 'Viking', svg: createBottleSVG('#1e3a8a', '#3b82f6'), color: 'from-blue-900 to-indigo-700' },
+      
+      // DIESEL
+      { id: 'diesel-only', brand: 'DIESEL', name: 'Only The Brave', svg: createBottleSVG('#78716c', '#d97706'), color: 'from-gray-800 to-amber-800' },
+      { id: 'diesel-spirit', brand: 'DIESEL', name: 'Spirit of the Brave', svg: createBottleSVG('#1e3a8a', '#3b82f6'), color: 'from-blue-900 to-sky-700' },
+      
+      // DIOR
+      { id: 'dior-fahrenheit', brand: 'DIOR', name: 'Fahrenheit', svg: createBottleSVG('#dc2626', '#f87171'), color: 'from-red-700 to-orange-500' },
+      { id: 'dior-homme', brand: 'DIOR', name: 'Dior Homme', svg: createBottleSVG('#52525b', '#a1a1aa'), color: 'from-zinc-600 to-gray-500' },
+      { id: 'dior-homme-intense', brand: 'DIOR', name: 'Dior Homme Intense', svg: createBottleSVG('#71717a', '#94a3b8'), color: 'from-zinc-700 to-slate-500' },
+      { id: 'dior-homme-sport', brand: 'DIOR', name: 'Dior Homme Sport', svg: createBottleSVG('#475569', '#cbd5e1'), color: 'from-slate-700 to-gray-300' },
+      { id: 'dior-sauvage', brand: 'DIOR', name: 'Sauvage', svg: createBottleSVG('#1e3a8a', '#3b82f6'), color: 'from-blue-900 to-slate-900' },
+      { id: 'dior-sauvage-elixir', brand: 'DIOR', name: 'Sauvage Elixir', svg: createBottleSVG('#1e293b', '#475569'), color: 'from-slate-900 to-gray-700' },
+      { id: 'dior-sauvage-parfum', brand: 'DIOR', name: 'Sauvage Parfum', svg: createBottleSVG('#0f172a', '#334155'), color: 'from-slate-950 to-slate-800' },
+      
+      // DOLCE & GABBANA
+      { id: 'dolce-one', brand: 'DOLCE & GABBANA', name: 'The One', svg: createBottleSVG('#9a3412', '#f97316'), color: 'from-amber-800 to-red-900' },
+      { id: 'dolce-light-blue', brand: 'DOLCE & GABBANA', name: 'Light Blue', svg: createBottleSVG('#0c4a6e', '#7dd3fc'), color: 'from-blue-800 to-sky-400' },
+      { id: 'dolce-k', brand: 'DOLCE & GABBANA', name: 'K by Dolce&Gabbana', svg: createBottleSVG('#ca8a04', '#fbbf24'), color: 'from-yellow-700 to-amber-600' },
+      
+      // GIVENCHY
+      { id: 'givenchy-gentleman', brand: 'GIVENCHY', name: 'Gentleman Reserve', svg: createBottleSVG('#6b21a8', '#a855f7'), color: 'from-purple-800 to-indigo-900' },
+      { id: 'givenchy-play', brand: 'GIVENCHY', name: 'Play Intense', svg: createBottleSVG('#0f172a', '#475569'), color: 'from-slate-900 to-gray-700' },
+      { id: 'givenchy-pi', brand: 'GIVENCHY', name: 'Pi Neo', svg: createBottleSVG('#0e7490', '#06b6d4'), color: 'from-cyan-800 to-blue-600' },
+      
+      // GUCCI
+      { id: 'gucci-guilty', brand: 'GUCCI', name: 'Guilty Absolute', svg: createBottleSVG('#7f1d1d', '#dc2626'), color: 'from-red-900 to-rose-900' },
+      { id: 'gucci-bamboo', brand: 'GUCCI', name: 'Bamboo', svg: createBottleSVG('#065f46', '#059669'), color: 'from-emerald-900 to-green-700' },
+      { id: 'gucci-bloom', brand: 'GUCCI', name: 'Bloom', svg: createBottleSVG('#be185d', '#f472b6'), color: 'from-pink-800 to-rose-500' },
+      
+      // HERMÈS
+      { id: 'hermes-terre', brand: 'HERMÈS', name: 'Terre d\'Hermès', svg: createBottleSVG('#c2410c', '#ea580c'), color: 'from-orange-900 to-amber-900' },
+      { id: 'hermes-voyage', brand: 'HERMÈS', name: 'Voyage d\'Hermès', svg: createBottleSVG('#ca8a04', '#fbbf24'), color: 'from-yellow-700 to-amber-600' },
+      { id: 'hermes-narcisse', brand: 'HERMÈS', name: 'Eau de Narcisse Bleu', svg: createBottleSVG('#1e3a8a', '#60a5fa'), color: 'from-blue-900 to-sky-600' },
+      
+      // HUGO BOSS
+      { id: 'hugo-boss', brand: 'HUGO BOSS', name: 'Bottled Infinite', svg: createBottleSVG('#334155', '#64748b'), color: 'from-slate-800 to-gray-900' },
+      { id: 'hugo-boss-night', brand: 'HUGO BOSS', name: 'Boss Bottled Night', svg: createBottleSVG('#1e3a8a', '#3b82f6'), color: 'from-blue-900 to-indigo-800' },
+      { id: 'hugo-boss-scent', brand: 'HUGO BOSS', name: 'The Scent', svg: createBottleSVG('#78350f', '#d97706'), color: 'from-amber-900 to-orange-700' },
+      
+      // ISSEY MIYAKE
+      { id: 'issey-homme', brand: 'ISSEY MIYAKE', name: 'L\'Eau d\'Issey Pour Homme', svg: createBottleSVG('#0c4a6e', '#0ea5e9'), color: 'from-blue-900 to-cyan-600' },
+      { id: 'issey-nuit', brand: 'ISSEY MIYAKE', name: 'Nuit d\'Issey', svg: createBottleSVG('#1e293b', '#475569'), color: 'from-slate-900 to-gray-700' },
+      
+      // JEAN PAUL GAULTIER
+      { id: 'jean-paul-le-beau', brand: 'JEAN PAUL GAULTIER', name: 'Le Beau', svg: createBottleSVG('#065f46', '#10b981'), color: 'from-emerald-900 to-green-700' },
+      { id: 'jean-paul-le-beau-intense', brand: 'JEAN PAUL GAULTIER', name: 'Le Beau Intense', svg: createBottleSVG('#064e3b', '#059669'), color: 'from-emerald-900 to-teal-700' },
+      { id: 'jean-paul', brand: 'JEAN PAUL GAULTIER', name: 'Le Male', svg: createBottleSVG('#075985', '#0ea5e9'), color: 'from-blue-700 to-cyan-800' },
+      { id: 'jean-paul-elixir', brand: 'JEAN PAUL GAULTIER', name: 'Le Male Elixir', svg: createBottleSVG('#78350f', '#d97706'), color: 'from-amber-900 to-orange-700' },
+      { id: 'jean-paul-essence', brand: 'JEAN PAUL GAULTIER', name: 'Le Male Essence de Parfum', svg: createBottleSVG('#1e3a8a', '#60a5fa'), color: 'from-blue-900 to-sky-600' },
+      { id: 'jean-paul-lover', brand: 'JEAN PAUL GAULTIER', name: 'Le Male Lover', svg: createBottleSVG('#be185d', '#f472b6'), color: 'from-pink-800 to-rose-500' },
+      { id: 'jean-paul-navy', brand: 'JEAN PAUL GAULTIER', name: 'Le Male In The Navy', svg: createBottleSVG('#1e40af', '#3b82f6'), color: 'from-blue-800 to-indigo-700' },
+      { id: 'jean-paul-ultra', brand: 'JEAN PAUL GAULTIER', name: 'Ultra Male', svg: createBottleSVG('#1e3a8a', '#3b82f6'), color: 'from-blue-900 to-indigo-700' },
+      { id: 'jean-paul-ultra-intense', brand: 'JEAN PAUL GAULTIER', name: 'Ultra Male Intense', svg: createBottleSVG('#7c2d12', '#ea580c'), color: 'from-orange-900 to-red-800' },
+      
+      // MONTBLANC
+      { id: 'montblanc-legend', brand: 'MONTBLANC', name: 'Legend Spirit', svg: createBottleSVG('#1e3a8a', '#3b82f6'), color: 'from-blue-900 to-slate-800' },
+      { id: 'montblanc-explorer', brand: 'MONTBLANC', name: 'Explorer', svg: createBottleSVG('#065f46', '#10b981'), color: 'from-emerald-900 to-teal-700' },
+      
+      // PACO RABANNE
+      { id: 'paco-1million', brand: 'PACO RABANNE', name: '1 Million', svg: createBottleSVG('#ca8a04', '#fbbf24'), color: 'from-yellow-800 to-amber-900' },
+      { id: 'paco-1million-elixir', brand: 'PACO RABANNE', name: '1 Million Elixir', svg: createBottleSVG('#78350f', '#d97706'), color: 'from-amber-900 to-orange-700' },
+      { id: 'paco-1million-parfum', brand: 'PACO RABANNE', name: '1 Million Parfum', svg: createBottleSVG('#92400e', '#f59e0b'), color: 'from-amber-900 to-yellow-600' },
+      { id: 'paco-1million-prive', brand: 'PACO RABANNE', name: '1 Million Privé', svg: createBottleSVG('#9a3412', '#fb923c'), color: 'from-orange-900 to-amber-700' },
+      { id: 'paco-invictus', brand: 'PACO RABANNE', name: 'Invictus', svg: createBottleSVG('#475569', '#94a3b8'), color: 'from-slate-700 to-gray-400' },
+      { id: 'paco-invictus-intense', brand: 'PACO RABANNE', name: 'Invictus Intense', svg: createBottleSVG('#1e3a8a', '#60a5fa'), color: 'from-blue-900 to-sky-600' },
+      { id: 'paco-invictus-platinum', brand: 'PACO RABANNE', name: 'Invictus Platinum', svg: createBottleSVG('#64748b', '#e2e8f0'), color: 'from-slate-600 to-gray-200' },
+      { id: 'paco-invictus-victory', brand: 'PACO RABANNE', name: 'Invictus Victory', svg: createBottleSVG('#0c4a6e', '#0ea5e9'), color: 'from-blue-900 to-sky-600' },
+      { id: 'paco-phantom', brand: 'PACO RABANNE', name: 'Phantom', svg: createBottleSVG('#475569', '#cbd5e1'), color: 'from-slate-700 to-gray-300' },
+      
+      // TOM FORD
+      { id: 'tomford-noir', brand: 'TOM FORD', name: 'Noir Extreme', svg: createBottleSVG('#1f2937', '#4b5563'), color: 'from-gray-900 to-slate-900' },
+      { id: 'tomford-oud', brand: 'TOM FORD', name: 'Oud Wood', svg: createBottleSVG('#78350f', '#92400e'), color: 'from-amber-900 to-brown-900' },
+      { id: 'tomford-tobacco', brand: 'TOM FORD', name: 'Tobacco Vanille', svg: createBottleSVG('#451a03', '#78350f'), color: 'from-brown-900 to-amber-900' },
+      
+      // VALENTINO
+      { id: 'valentino-uomo', brand: 'VALENTINO', name: 'Uomo Intense', svg: createBottleSVG('#78350f', '#d97706'), color: 'from-brown-900 to-amber-900' },
+      { id: 'valentino-born', brand: 'VALENTINO', name: 'Born in Roma', svg: createBottleSVG('#7c2d12', '#ea580c'), color: 'from-orange-900 to-red-800' },
+      
+      // VERSACE
+      { id: 'versace-dylan-blue', brand: 'VERSACE', name: 'Dylan Blue', svg: createBottleSVG('#1e3a8a', '#3b82f6'), color: 'from-blue-900 to-indigo-800' },
+      { id: 'versace-eros', brand: 'VERSACE', name: 'Eros', svg: createBottleSVG('#0e7490', '#06b6d4'), color: 'from-cyan-900 to-blue-900' },
+      { id: 'versace-eros-edp', brand: 'VERSACE', name: 'Eros Eau de Parfum', svg: createBottleSVG('#0c4a6e', '#0284c7'), color: 'from-blue-900 to-cyan-800' },
+      { id: 'versace-eros-flame', brand: 'VERSACE', name: 'Eros Flame', svg: createBottleSVG('#dc2626', '#f87171'), color: 'from-red-700 to-orange-500' },
+      { id: 'versace-man-eau-fraiche', brand: 'VERSACE', name: 'Man Eau Fraîche', svg: createBottleSVG('#0e7490', '#67e8f9'), color: 'from-cyan-800 to-sky-400' },
+      { id: 'versace-pour-homme', brand: 'VERSACE', name: 'Pour Homme', svg: createBottleSVG('#0c4a6e', '#0ea5e9'), color: 'from-blue-900 to-sky-700' },
+      
+      // VIKTOR & ROLF
+      { id: 'viktor-spicebomb', brand: 'VIKTOR & ROLF', name: 'Spicebomb', svg: createBottleSVG('#7c2d12', '#ea580c'), color: 'from-orange-900 to-red-800' },
+      { id: 'viktor-extreme', brand: 'VIKTOR & ROLF', name: 'Spicebomb Extreme', svg: createBottleSVG('#991b1b', '#dc2626'), color: 'from-red-900 to-orange-800' },
+      
+      // YSL
+      { id: 'ysl-homme', brand: 'YSL', name: 'L\'Homme', svg: createBottleSVG('#1e3a8a', '#3b82f6'), color: 'from-blue-900 to-indigo-800' },
+      { id: 'ysl-homme-intense', brand: 'YSL', name: 'L\'Homme Intense', svg: createBottleSVG('#1e40af', '#60a5fa'), color: 'from-blue-800 to-sky-600' },
+      { id: 'ysl-nuit', brand: 'YSL', name: 'La Nuit de L\'Homme', svg: createBottleSVG('#1e293b', '#475569'), color: 'from-slate-900 to-gray-700' },
+      { id: 'ysl-nuit-bleu', brand: 'YSL', name: 'La Nuit de L\'Homme Bleu Électrique', svg: createBottleSVG('#1e3a8a', '#3b82f6'), color: 'from-blue-900 to-indigo-700' },
+      { id: 'ysl-y', brand: 'YSL', name: 'Y Eau de Parfum', svg: createBottleSVG('#7c3aed', '#a78bfa'), color: 'from-purple-900 to-pink-900' },
+      { id: 'ysl-y-edp-intense', brand: 'YSL', name: 'Y Eau de Parfum Intense', svg: createBottleSVG('#6b21a8', '#9333ea'), color: 'from-purple-900 to-violet-800' },
+      { id: 'ysl-y-live', brand: 'YSL', name: 'Y Live', svg: createBottleSVG('#065f46', '#10b981'), color: 'from-emerald-900 to-green-600' },
+    ].sort((a, b) => {
+      // Ordenar por marca alfabéticamente, y luego por nombre
+      if (a.brand < b.brand) return -1;
+      if (a.brand > b.brand) return 1;
+      if (a.name < b.name) return -1;
+      if (a.name > b.name) return 1;
+      return 0;
+    });
+
+    function createBottleSVG(color1, color2) {
+      return `
+        <svg viewBox="0 0 100 200" xmlns="http://www.w3.org/2000/svg" style="width: 80%; height: 80%;">
+          <defs>
+            <linearGradient id="grad-${color1}" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" style="stop-color:${color1};stop-opacity:1" />
+              <stop offset="100%" style="stop-color:${color2};stop-opacity:1" />
+            </linearGradient>
+            <filter id="shine">
+              <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+              <feOffset dx="2" dy="2" result="offsetblur"/>
+              <feComponentTransfer>
+                <feFuncA type="linear" slope="0.3"/>
+              </feComponentTransfer>
+              <feMerge>
+                <feMergeNode/>
+                <feMergeNode in="SourceGraphic"/>
+              </feMerge>
+            </filter>
+          </defs>
+          <!-- Cap -->
+          <rect x="35" y="10" width="30" height="15" fill="${color1}" rx="2"/>
+          <rect x="32" y="20" width="36" height="8" fill="${color1}" opacity="0.8"/>
+          <!-- Neck -->
+          <rect x="38" y="28" width="24" height="20" fill="url(#grad-${color1})" opacity="0.9"/>
+          <!-- Main Bottle -->
+          <rect x="25" y="48" width="50" height="130" rx="8" fill="url(#grad-${color1})" filter="url(#shine)"/>
+          <!-- Shine effect -->
+          <rect x="30" y="55" width="8" height="100" rx="4" fill="white" opacity="0.3"/>
+          <!-- Liquid -->
+          <rect x="28" y="100" width="44" height="75" rx="6" fill="${color2}" opacity="0.6"/>
+          <!-- Label -->
+          <rect x="30" y="120" width="40" height="30" fill="rgba(255,255,255,0.2)" rx="2"/>
+        </svg>
+      `;
+    }
+
+    const defaultConfig = {
+      app_title: "PERFUME VAULT",
+      news_title: "LANZAMIENTOS EXCLUSIVOS",
+      background_color: "#0a0a0a",
+      surface_color: "#1a1a1a",
+      text_color: "#ffffff",
+      primary_action_color: "#d946ef",
+      secondary_action_color: "#9333ea"
+    };
+
+    let userPerfumes = [];
+    let currentView = 'catalog';
+    let selectedPerfume = null;
+    let selectedRating = 0;
+    let currentFriend = null;
+    let selectedAvatar = '👤';
+    let selectedGradient = 'from-purple-600 to-pink-600';
+    let userProfile = {
+      username: '@mi_usuario',
+      bio: 'Coleccionista de perfumes',
+      avatar: '👤',
+      gradient: 'from-purple-600 to-pink-600',
+      is_public: true
+    };
+    
+    // Base de datos simulada de amigos
+    const FRIENDS_DATABASE = [
+      { id: 'perfume_master', name: '@perfume_master', bio: 'Coleccionista experto', avatar: '👨‍💼', gradient: 'from-purple-600 to-pink-600', perfumes: ['dior-sauvage', 'chanel-bleu', 'creed-aventus', 'paco-1million', 'jean-paul', 'armani-code', 'versace-eros', 'ysl-y', 'dior-homme', 'tom-ford-noir'], wishlist: ['creed-viking', 'tom-ford-tobacco', 'bvlgari-man'] },
+      { id: 'scent_expert', name: '@scent_expert', bio: 'Crítico profesional', avatar: '👩‍🔬', gradient: 'from-blue-600 to-cyan-600', perfumes: ['chanel-bleu-parfum', 'hermes-terre', 'creed-millesime', 'dior-sauvage-elixir', 'tom-ford-oud', 'acqua-colonia', 'ysl-nuit'], wishlist: ['creed-silver', 'chanel-platinum', 'hermes-narcisse'] },
+      { id: 'fragrance_pro', name: '@fragrance_pro', bio: 'Influencer de fragancias', avatar: '🌟', gradient: 'from-green-600 to-emerald-600', perfumes: ['paco-invictus', 'versace-dylan-blue', 'armani-acqua', 'jean-paul-ultra', 'dolce-light-blue'], wishlist: ['paco-phantom', 'versace-eros-flame', 'armani-stronger'] },
+      { id: 'luxury_collector', name: '@luxury_collector', bio: 'Coleccionista de nicho', avatar: '💎', gradient: 'from-amber-600 to-yellow-600', perfumes: ['creed-aventus', 'creed-viking', 'creed-silver', 'tom-ford-tobacco', 'tom-ford-oud', 'hermes-terre'], wishlist: ['creed-millesime', 'tom-ford-noir'] },
+      { id: 'fresh_scents', name: '@fresh_scents', bio: 'Amante de frescas', avatar: '🌊', gradient: 'from-cyan-600 to-blue-600', perfumes: ['versace-man-eau-fraiche', 'dolce-light-blue', 'acqua-essenza', 'issey-homme', 'chanel-allure-sport'], wishlist: ['hermes-voyage', 'bvlgari-aqva'] },
+      { id: 'oriental_vibes', name: '@oriental_vibes', bio: 'Fan de orientales', avatar: '🔥', gradient: 'from-red-600 to-orange-600', perfumes: ['viktor-spicebomb', 'viktor-extreme', 'paco-1million-elixir', 'ysl-y', 'jean-paul-le-male-elixir'], wishlist: ['tom-ford-tobacco', 'dior-fahrenheit'] },
+      { id: 'classic_man', name: '@classic_man', bio: 'Clásico atemporal', avatar: '🎩', gradient: 'from-gray-600 to-slate-600', perfumes: ['chanel-bleu', 'dior-homme', 'armani-code', 'hugo-boss', 'burberry-london'], wishlist: ['chanel-platinum', 'dior-homme-intense'] },
+      { id: 'sport_fresh', name: '@sport_fresh', bio: 'Deportivo y fresco', avatar: '⚡', gradient: 'from-lime-600 to-green-600', perfumes: ['chanel-allure-sport', 'chanel-allure-extreme', 'dior-homme-sport', 'paco-invictus', 'versace-pour-homme'], wishlist: ['paco-invictus-victory', 'armani-acqua-absolu'] },
+      { id: 'night_owl', name: '@night_owl', bio: 'Perfumes de noche', avatar: '🌙', gradient: 'from-indigo-600 to-purple-600', perfumes: ['ysl-nuit', 'ysl-nuit-bleu', 'hugo-boss-night', 'givenchy-gentleman', 'issey-nuit'], wishlist: ['tom-ford-noir', 'dior-sauvage-parfum'] },
+      { id: 'summer_lover', name: '@summer_lover', bio: 'Verano eterno', avatar: '☀️', gradient: 'from-orange-600 to-yellow-600', perfumes: ['dolce-light-blue', 'versace-man-eau-fraiche', 'acqua-colonia', 'hermes-voyage', 'issey-homme'], wishlist: ['acqua-essenza', 'hermes-narcisse'] },
+      { id: 'spicy_soul', name: '@spicy_soul', bio: 'Adicto a especiadas', avatar: '🌶️', gradient: 'from-red-700 to-amber-700', perfumes: ['viktor-spicebomb', 'viktor-extreme', 'dior-fahrenheit', 'paco-1million-elixir', 'jean-paul-le-male-elixir'], wishlist: ['tom-ford-tobacco', 'hermes-terre'] },
+      { id: 'minimalist_scent', name: '@minimalist_scent', bio: 'Menos es más', avatar: '⚪', gradient: 'from-slate-600 to-gray-400', perfumes: ['ck-one', 'ck-eternity', 'issey-homme', 'chanel-allure'], wishlist: ['hermes-voyage', 'acqua-colonia'] }
+    ];
+
+    const dataHandler = {
+      onDataChanged(data) {
+        userPerfumes = data;
+        
+        // Load profile data
+        const profileData = data.find(p => p.profile_username);
+        if (profileData) {
+          userProfile = {
+            username: profileData.profile_username,
+            bio: profileData.profile_bio,
+            avatar: profileData.profile_avatar,
+            gradient: profileData.profile_gradient,
+            is_public: profileData.profile_is_public
+          };
+        }
+        
+        updateStats();
+        renderCurrentView();
+      }
+    };
+
+    async function onConfigChange(config) {
+      document.getElementById('app-title').textContent = config.app_title || defaultConfig.app_title;
+      document.getElementById('news-title').textContent = config.news_title || defaultConfig.news_title;
+      
+      const bgColor = config.background_color || defaultConfig.background_color;
+      const surfaceColor = config.surface_color || defaultConfig.surface_color;
+      const textColor = config.text_color || defaultConfig.text_color;
+      const primaryColor = config.primary_action_color || defaultConfig.primary_action_color;
+      
+      document.getElementById('app').style.background = bgColor;
+      
+      const surfaces = document.querySelectorAll('.gradient-border');
+      surfaces.forEach(el => {
+        el.style.background = `linear-gradient(${surfaceColor}, ${surfaceColor}) padding-box, linear-gradient(135deg, ${primaryColor}, ${config.secondary_action_color || defaultConfig.secondary_action_color}) border-box`;
+      });
+    }
+
+    async function initializeApp() {
+      if (window.dataSdk) {
+        const initResult = await window.dataSdk.init(dataHandler);
+        if (!initResult.isOk) {
+          console.error("Error al inicializar Data SDK");
+        }
+      }
+      
+      if (window.elementSdk) {
+        window.elementSdk.init({
+          defaultConfig,
+          onConfigChange,
+          mapToCapabilities: (config) => ({
+            recolorables: [
+              {
+                get: () => config.background_color || defaultConfig.background_color,
+                set: (value) => {
+                  config.background_color = value;
+                  window.elementSdk.setConfig({ background_color: value });
+                }
+              },
+              {
+                get: () => config.surface_color || defaultConfig.surface_color,
+                set: (value) => {
+                  config.surface_color = value;
+                  window.elementSdk.setConfig({ surface_color: value });
+                }
+              },
+              {
+                get: () => config.text_color || defaultConfig.text_color,
+                set: (value) => {
+                  config.text_color = value;
+                  window.elementSdk.setConfig({ text_color: value });
+                }
+              },
+              {
+                get: () => config.primary_action_color || defaultConfig.primary_action_color,
+                set: (value) => {
+                  config.primary_action_color = value;
+                  window.elementSdk.setConfig({ primary_action_color: value });
+                }
+              },
+              {
+                get: () => config.secondary_action_color || defaultConfig.secondary_action_color,
+                set: (value) => {
+                  config.secondary_action_color = value;
+                  window.elementSdk.setConfig({ secondary_action_color: value });
+                }
+              }
+            ],
+            borderables: [],
+            fontEditable: undefined,
+            fontSizeable: undefined
+          }),
+          mapToEditPanelValues: (config) => new Map([
+            ["app_title", config.app_title || defaultConfig.app_title],
+            ["news_title", config.news_title || defaultConfig.news_title]
+          ])
+        });
+      }
+      
+      setupEventListeners();
+      renderCatalog();
+    }
+
+    function setupEventListeners() {
+      document.getElementById('menu-btn').addEventListener('click', () => {
+        document.getElementById('sidebar').classList.add('open');
+        document.getElementById('overlay').classList.add('active');
+      });
+      
+      document.getElementById('close-menu').addEventListener('click', closeSidebar);
+      document.getElementById('overlay').addEventListener('click', closeSidebar);
+      
+      document.querySelectorAll('.menu-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+          const view = e.currentTarget.dataset.view;
+          switchView(view);
+          closeSidebar();
+        });
+      });
+      
+      document.getElementById('close-detail').addEventListener('click', closeDetailModal);
+      document.getElementById('save-detail-btn').addEventListener('click', saveDetailChanges);
+      
+      document.querySelectorAll('#detail-rating-stars .star').forEach(star => {
+        star.addEventListener('click', (e) => {
+          selectedRating = parseInt(e.target.dataset.rating);
+          updateStarDisplay();
+        });
+      });
+      
+      document.getElementById('detail-owned').addEventListener('change', updateCheckboxStyles);
+      document.getElementById('detail-wishlist').addEventListener('change', updateCheckboxStyles);
+      document.getElementById('detail-fake').addEventListener('change', updateCheckboxStyles);
+      
+      document.getElementById('detail-modal').addEventListener('click', (e) => {
+        if (e.target.id === 'detail-modal') closeDetailModal();
+      });
+      
+      document.getElementById('friend-search').addEventListener('input', (e) => {
+        renderFriends(e.target.value);
+      });
+      
+      document.getElementById('close-friend-profile').addEventListener('click', closeFriendProfile);
+      
+      document.getElementById('friend-profile-modal').addEventListener('click', (e) => {
+        if (e.target.id === 'friend-profile-modal') closeFriendProfile();
+      });
+      
+      document.getElementById('toggle-follow-btn').addEventListener('click', async () => {
+        if (currentFriend) {
+          await toggleFollow(currentFriend.id);
+          openFriendProfile(currentFriend.id);
+        }
+      });
+      
+      document.querySelectorAll('.friend-tab').forEach(tab => {
+        tab.addEventListener('click', (e) => {
+          const tabName = e.target.dataset.tab;
+          
+          document.querySelectorAll('.friend-tab').forEach(t => {
+            t.classList.remove('text-white', 'border-purple-500');
+            t.classList.add('text-gray-500');
+            t.style.borderBottomWidth = '0';
+          });
+          
+          e.target.classList.add('text-white', 'border-purple-500');
+          e.target.classList.remove('text-gray-500');
+          e.target.style.borderBottomWidth = '2px';
+          
+          document.querySelectorAll('.friend-tab-content').forEach(content => {
+            content.classList.add('hidden');
+          });
+          
+          if (tabName === 'collection') {
+            document.getElementById('friend-collection-tab').classList.remove('hidden');
+            renderFriendCollection();
+          } else if (tabName === 'wishlist') {
+            document.getElementById('friend-wishlist-tab').classList.remove('hidden');
+            renderFriendWishlist();
+          }
+        });
+      });
+      
+      document.getElementById('edit-profile-btn').addEventListener('click', openEditProfile);
+      document.getElementById('close-edit-profile').addEventListener('click', closeEditProfile);
+      document.getElementById('save-profile-btn').addEventListener('click', saveProfile);
+      
+      document.getElementById('edit-profile-modal').addEventListener('click', (e) => {
+        if (e.target.id === 'edit-profile-modal') closeEditProfile();
+      });
+      
+      document.querySelectorAll('.avatar-option').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const btn = e.currentTarget;
+          selectedAvatar = btn.dataset.avatar;
+          selectedGradient = btn.dataset.gradient;
+          
+          document.querySelectorAll('.avatar-option').forEach(b => {
+            b.classList.remove('border-purple-500');
+            b.classList.add('border-transparent');
+          });
+          
+          btn.classList.remove('border-transparent');
+          btn.classList.add('border-purple-500');
+        });
+      });
+      
+      document.getElementById('edit-bio').addEventListener('input', (e) => {
+        const length = e.target.value.length;
+        document.getElementById('bio-counter').textContent = `${length}/100`;
+      });
+      
+      document.querySelectorAll('.profile-social-tab').forEach(tab => {
+        tab.addEventListener('click', (e) => {
+          const tabName = e.target.dataset.tab;
+          
+          document.querySelectorAll('.profile-social-tab').forEach(t => {
+            t.classList.remove('text-white', 'border-purple-500');
+            t.classList.add('text-gray-500');
+            t.style.borderBottomWidth = '0';
+          });
+          
+          e.target.classList.add('text-white', 'border-purple-500');
+          e.target.classList.remove('text-gray-500');
+          e.target.style.borderBottomWidth = '2px';
+          
+          document.querySelectorAll('.profile-social-content').forEach(content => {
+            content.classList.add('hidden');
+          });
+          
+          if (tabName === 'following') {
+            document.getElementById('following-tab').classList.remove('hidden');
+            renderFollowing();
+          } else if (tabName === 'followers') {
+            document.getElementById('followers-tab').classList.remove('hidden');
+            renderFollowers();
+          }
+        });
+      });
+    }
+
+    function closeSidebar() {
+      document.getElementById('sidebar').classList.remove('open');
+      document.getElementById('overlay').classList.remove('active');
+    }
+
+    function switchView(viewName) {
+      currentView = viewName;
+      
+      document.querySelectorAll('.menu-item').forEach(item => {
+        item.classList.remove('text-white', 'bg-gray-800');
+        item.classList.add('text-gray-400');
+      });
+      
+      const activeItem = document.querySelector(`[data-view="${viewName}"]`);
+      activeItem.classList.add('text-white', 'bg-gray-800');
+      activeItem.classList.remove('text-gray-400');
+      
+      document.querySelectorAll('.view-content').forEach(view => {
+        view.classList.add('hidden');
+      });
+      
+      document.getElementById(`${viewName}-view`).classList.remove('hidden');
+      renderCurrentView();
+    }
+    
+    function openEditProfile() {
+      document.getElementById('edit-username').value = userProfile.username;
+      document.getElementById('edit-bio').value = userProfile.bio;
+      document.getElementById('privacy-toggle').checked = userProfile.is_public;
+      document.getElementById('bio-counter').textContent = `${userProfile.bio.length}/100`;
+      
+      selectedAvatar = userProfile.avatar;
+      selectedGradient = userProfile.gradient;
+      
+      document.querySelectorAll('.avatar-option').forEach(btn => {
+        if (btn.dataset.avatar === selectedAvatar) {
+          btn.classList.remove('border-transparent');
+          btn.classList.add('border-purple-500');
+        } else {
+          btn.classList.remove('border-purple-500');
+          btn.classList.add('border-transparent');
+        }
+        
+        const gradient = btn.dataset.gradient;
+        btn.className = `avatar-option w-14 h-14 rounded-full flex items-center justify-center text-2xl hover:scale-110 transition-transform border-2 bg-gradient-to-br ${gradient} ${btn.dataset.avatar === selectedAvatar ? 'border-purple-500' : 'border-transparent'}`;
+      });
+      
+      document.getElementById('edit-profile-modal').classList.add('active');
+    }
+    
+    function closeEditProfile() {
+      document.getElementById('edit-profile-modal').classList.remove('active');
+    }
+    
+    async function saveProfile() {
+      const username = document.getElementById('edit-username').value.trim();
+      const bio = document.getElementById('edit-bio').value.trim();
+      const isPublic = document.getElementById('privacy-toggle').checked;
+      
+      if (!username) {
+        showToast('El nombre de usuario no puede estar vacío', 'error');
+        return;
+      }
+      
+      const saveBtn = document.getElementById('save-profile-btn');
+      const originalText = saveBtn.textContent;
+      saveBtn.innerHTML = 'GUARDANDO... <span class="loading-spinner"></span>';
+      saveBtn.disabled = true;
+      
+      const profileData = {
+        profile_username: username.startsWith('@') ? username : `@${username}`,
+        profile_bio: bio,
+        profile_avatar: selectedAvatar,
+        profile_gradient: selectedGradient,
+        profile_is_public: isPublic,
+        created_at: new Date().toISOString()
+      };
+      
+      const existingProfile = userPerfumes.find(p => p.profile_username);
+      
+      let result;
+      if (existingProfile) {
+        result = await window.dataSdk.update({ ...existingProfile, ...profileData });
+      } else {
+        if (userPerfumes.length >= 999) {
+          showToast('Límite alcanzado: máximo 999 registros', 'error');
+          saveBtn.textContent = originalText;
+          saveBtn.disabled = false;
+          return;
+        }
+        result = await window.dataSdk.create(profileData);
+      }
+      
+      if (result.isOk) {
+        showToast('Perfil actualizado correctamente');
+        closeEditProfile();
+      } else {
+        showToast('Error al actualizar el perfil', 'error');
+      }
+      
+      saveBtn.textContent = originalText;
+      saveBtn.disabled = false;
+    }
+    
+    function renderProfile() {
+      document.getElementById('profile-avatar-display').className = `w-32 h-32 mx-auto bg-gradient-to-br ${userProfile.gradient} rounded-full flex items-center justify-center text-5xl mb-4`;
+      document.getElementById('profile-avatar-display').textContent = userProfile.avatar;
+      document.getElementById('profile-username-display').textContent = userProfile.username;
+      document.getElementById('profile-bio-display').textContent = userProfile.bio;
+      
+      const badge = document.getElementById('profile-privacy-badge');
+      if (userProfile.is_public) {
+        badge.className = 'inline-block px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-xs font-bold';
+        badge.textContent = '🌍 CUENTA PÚBLICA';
+      } else {
+        badge.className = 'inline-block px-3 py-1 bg-gray-500/20 text-gray-400 rounded-full text-xs font-bold';
+        badge.textContent = '🔒 CUENTA PRIVADA';
+      }
+      
+      const perfumeCount = userPerfumes.filter(p => p.owned).length;
+      const followingCount = userPerfumes.filter(p => p.friend_followed).length;
+      const followersCount = FRIENDS_DATABASE.reduce((acc, friend) => {
+        const hasProfile = userPerfumes.find(p => p.profile_username);
+        return hasProfile && Math.random() > 0.5 ? acc + 1 : acc;
+      }, 0);
+      
+      document.getElementById('profile-stat-perfumes').textContent = perfumeCount;
+      document.getElementById('profile-stat-following').textContent = followingCount;
+      document.getElementById('profile-stat-followers').textContent = followersCount;
+      
+      renderFollowing();
+    }
+    
+    function renderFollowing() {
+      const following = userPerfumes.filter(p => p.friend_followed);
+      const list = document.getElementById('following-list');
+      const empty = document.getElementById('following-empty');
+      
+      if (following.length === 0) {
+        list.innerHTML = '';
+        empty.classList.remove('hidden');
+        return;
+      }
+      
+      empty.classList.add('hidden');
+      list.innerHTML = following.map(f => {
+        const friend = FRIENDS_DATABASE.find(fr => fr.id === f.friend_id);
+        if (!friend) return '';
+        
+        return `
+          <div class="flex items-center justify-between p-4 rounded-lg hover:bg-gray-900/50 transition-colors" style="background: #0f0f0f;">
+            <div class="flex items-center space-x-3">
+              <div class="w-12 h-12 bg-gradient-to-br ${friend.gradient} rounded-full flex items-center justify-center text-xl">
+                ${friend.avatar}
+              </div>
+              <div>
+                <div class="text-white font-semibold">${friend.name}</div>
+                <div class="text-gray-500 text-xs">${friend.bio}</div>
+              </div>
+            </div>
+            <button class="unfollow-btn bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-all" data-friend-id="${friend.id}">
+              Siguiendo
+            </button>
+          </div>
+        `;
+      }).join('');
+      
+      list.querySelectorAll('.unfollow-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const friendId = btn.dataset.friendId;
+          await toggleFollow(friendId);
+        });
+      });
+    }
+    
+    function renderFollowers() {
+      const list = document.getElementById('followers-list');
+      const empty = document.getElementById('followers-empty');
+      
+      // Simular seguidores (en una app real vendrían del backend)
+      const hasProfile = userPerfumes.find(p => p.profile_username);
+      const followers = hasProfile 
+        ? FRIENDS_DATABASE.filter((_, i) => i % 2 === 0).slice(0, 5)
+        : [];
+      
+      if (followers.length === 0) {
+        list.innerHTML = '';
+        empty.classList.remove('hidden');
+        return;
+      }
+      
+      empty.classList.add('hidden');
+      list.innerHTML = followers.map(friend => {
+        const isFollowing = userPerfumes.some(p => p.friend_id === friend.id && p.friend_followed);
+        
+        return `
+          <div class="flex items-center justify-between p-4 rounded-lg hover:bg-gray-900/50 transition-colors" style="background: #0f0f0f;">
+            <div class="flex items-center space-x-3">
+              <div class="w-12 h-12 bg-gradient-to-br ${friend.gradient} rounded-full flex items-center justify-center text-xl">
+                ${friend.avatar}
+              </div>
+              <div>
+                <div class="text-white font-semibold">${friend.name}</div>
+                <div class="text-gray-500 text-xs">${friend.bio}</div>
+              </div>
+            </div>
+            <button class="follower-follow-btn ${isFollowing ? 'bg-gray-700' : 'bg-gradient-to-r from-purple-600 to-pink-600'} text-white px-4 py-2 rounded-lg text-sm font-semibold transition-all hover:opacity-90" data-friend-id="${friend.id}">
+              ${isFollowing ? 'Siguiendo' : 'Seguir'}
+            </button>
+          </div>
+        `;
+      }).join('');
+      
+      list.querySelectorAll('.follower-follow-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const friendId = btn.dataset.friendId;
+          await toggleFollow(friendId);
+          renderFollowers();
+        });
+      });
+    }
+
+    function renderCurrentView() {
+      if (currentView === 'catalog') {
+        renderCatalog();
+      } else if (currentView === 'collection') {
+        renderCollection();
+      } else if (currentView === 'wishlist') {
+        renderWishlist();
+      } else if (currentView === 'community') {
+        renderFriends();
+      } else if (currentView === 'profile') {
+        renderProfile();
+      }
+    }
+    
+    function renderFriends(searchTerm = '') {
+      const grid = document.getElementById('friends-grid');
+      const filtered = searchTerm 
+        ? FRIENDS_DATABASE.filter(f => f.name.toLowerCase().includes(searchTerm.toLowerCase()) || f.bio.toLowerCase().includes(searchTerm.toLowerCase()))
+        : FRIENDS_DATABASE;
+      
+      grid.innerHTML = filtered.map(friend => {
+        const isFollowing = userPerfumes.some(p => p.friend_id === friend.id && p.friend_followed);
+        return `
+          <div class="gradient-border rounded-lg p-6 hover:shadow-lg hover:shadow-purple-500/20 transition-all cursor-pointer friend-card" data-friend-id="${friend.id}">
+            <div class="flex items-center space-x-4 mb-4">
+              <div class="w-16 h-16 bg-gradient-to-br ${friend.gradient} rounded-full flex items-center justify-center text-2xl">
+                ${friend.avatar}
+              </div>
+              <div>
+                <h3 class="text-white font-bold text-lg">${friend.name}</h3>
+                <p class="text-gray-500 text-sm">${friend.bio}</p>
+              </div>
+            </div>
+            <div class="flex justify-between text-sm mb-4">
+              <span class="text-gray-400">${friend.perfumes.length} colección</span>
+              <span class="text-gray-400">${friend.wishlist.length} deseos</span>
+            </div>
+            <button class="follow-btn w-full ${isFollowing ? 'bg-gray-700' : 'bg-gradient-to-r from-purple-600 to-pink-600'} text-white py-2 rounded-lg font-semibold hover:opacity-90 transition-all" data-friend-id="${friend.id}">
+              ${isFollowing ? 'SIGUIENDO ✓' : 'SEGUIR'}
+            </button>
+          </div>
+        `;
+      }).join('');
+      
+      // Event listeners para ver perfil
+      grid.querySelectorAll('.friend-card').forEach(card => {
+        card.addEventListener('click', (e) => {
+          if (!e.target.classList.contains('follow-btn')) {
+            const friendId = card.dataset.friendId;
+            openFriendProfile(friendId);
+          }
+        });
+      });
+      
+      // Event listeners para seguir/dejar de seguir
+      grid.querySelectorAll('.follow-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const friendId = btn.dataset.friendId;
+          await toggleFollow(friendId);
+        });
+      });
+    }
+    
+    async function toggleFollow(friendId) {
+      const friend = FRIENDS_DATABASE.find(f => f.id === friendId);
+      if (!friend) return;
+      
+      const existingFollow = userPerfumes.find(p => p.friend_id === friendId);
+      
+      if (existingFollow) {
+        const updatedFollow = { ...existingFollow, friend_followed: !existingFollow.friend_followed };
+        const result = await window.dataSdk.update(updatedFollow);
+        if (result.isOk) {
+          showToast(updatedFollow.friend_followed ? `Ahora sigues a ${friend.name}` : `Dejaste de seguir a ${friend.name}`);
+        }
+      } else {
+        if (userPerfumes.length >= 999) {
+          showToast('Límite alcanzado: máximo 999 registros', 'error');
+          return;
+        }
+        const result = await window.dataSdk.create({
+          friend_id: friendId,
+          friend_name: friend.name,
+          friend_followed: true,
+          created_at: new Date().toISOString()
+        });
+        if (result.isOk) {
+          showToast(`Ahora sigues a ${friend.name}`);
+        }
+      }
+    }
+    
+    function openFriendProfile(friendId) {
+      const friend = FRIENDS_DATABASE.find(f => f.id === friendId);
+      if (!friend) return;
+      
+      currentFriend = friend;
+      
+      document.getElementById('friend-profile-avatar').className = `w-20 h-20 bg-gradient-to-br ${friend.gradient} rounded-full flex items-center justify-center text-3xl`;
+      document.getElementById('friend-profile-avatar').textContent = friend.avatar;
+      document.getElementById('friend-profile-name').textContent = friend.name;
+      document.getElementById('friend-profile-bio').textContent = friend.bio;
+      document.getElementById('friend-profile-owned').textContent = friend.perfumes.length;
+      document.getElementById('friend-profile-wishlist').textContent = friend.wishlist.length;
+      
+      const isFollowing = userPerfumes.some(p => p.friend_id === friendId && p.friend_followed);
+      const followBtn = document.getElementById('toggle-follow-btn');
+      if (isFollowing) {
+        followBtn.textContent = 'SIGUIENDO ✓';
+        followBtn.className = 'bg-gray-700 text-white px-8 py-3 rounded-lg font-bold hover:opacity-90 transition-all';
+      } else {
+        followBtn.textContent = 'SEGUIR';
+        followBtn.className = 'bg-gradient-to-r from-purple-600 to-pink-600 text-white px-8 py-3 rounded-lg font-bold hover:from-purple-700 hover:to-pink-700 transition-all';
+      }
+      
+      renderFriendCollection();
+      document.getElementById('friend-profile-modal').classList.add('active');
+    }
+    
+    function closeFriendProfile() {
+      document.getElementById('friend-profile-modal').classList.remove('active');
+      currentFriend = null;
+    }
+    
+    function renderFriendCollection() {
+      if (!currentFriend) return;
+      
+      const grid = document.getElementById('friend-collection-grid');
+      const empty = document.getElementById('friend-collection-empty');
+      
+      if (currentFriend.perfumes.length === 0) {
+        grid.innerHTML = '';
+        empty.classList.remove('hidden');
+        return;
+      }
+      
+      empty.classList.add('hidden');
+      grid.innerHTML = currentFriend.perfumes.map(perfumeId => {
+        const perfume = PERFUME_CATALOG.find(p => p.id === perfumeId);
+        if (!perfume) return '';
+        
+        return `
+          <div class="rounded-lg overflow-hidden" style="opacity: 0.9;">
+            <div class="h-32 bg-gradient-to-br ${perfume.color} flex items-center justify-center">
+              ${perfume.svg}
+            </div>
+            <div class="p-2" style="background: #1a1a1a;">
+              <h3 class="text-white font-bold text-xs mb-1">${perfume.brand}</h3>
+              <p class="text-gray-400 text-xs truncate">${perfume.name}</p>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+    
+    function renderFriendWishlist() {
+      if (!currentFriend) return;
+      
+      const grid = document.getElementById('friend-wishlist-grid');
+      const empty = document.getElementById('friend-wishlist-empty');
+      
+      if (currentFriend.wishlist.length === 0) {
+        grid.innerHTML = '';
+        empty.classList.remove('hidden');
+        return;
+      }
+      
+      empty.classList.add('hidden');
+      grid.innerHTML = currentFriend.wishlist.map(perfumeId => {
+        const perfume = PERFUME_CATALOG.find(p => p.id === perfumeId);
+        if (!perfume) return '';
+        
+        return `
+          <div class="rounded-lg overflow-hidden" style="opacity: 0.9;">
+            <div class="h-32 bg-gradient-to-br ${perfume.color} flex items-center justify-center">
+              ${perfume.svg}
+            </div>
+            <div class="p-2" style="background: #1a1a1a;">
+              <h3 class="text-white font-bold text-xs mb-1">${perfume.brand}</h3>
+              <p class="text-gray-400 text-xs truncate">${perfume.name}</p>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderCatalog() {
+      const grid = document.getElementById('catalog-grid');
+      grid.innerHTML = PERFUME_CATALOG.map(perfume => {
+        const userData = userPerfumes.find(p => p.perfume_id === perfume.id);
+        let classes = 'perfume-item';
+        if (userData?.owned) classes += ' owned';
+        if (userData?.wishlist && !userData?.owned) classes += ' wishlist';
+        if (userData?.is_fake) classes += ' fake';
+        
+        // Extraer el primer color del gradiente para los iconos
+        const colorMatch = perfume.color.match(/from-(\w+)-(\d+)/);
+        const iconColor = colorMatch ? `--tw-gradient-from: var(--tw-${colorMatch[1]}-${colorMatch[2]})` : '';
+        
+        return `
+          <div class="${classes} rounded-lg overflow-hidden cursor-pointer" data-perfume-id="${perfume.id}" data-color="${perfume.color}">
+            <div class="h-40 bg-gradient-to-br ${perfume.color} flex items-center justify-center">
+              ${perfume.svg}
+            </div>
+            <div class="p-3" style="background: #1a1a1a;">
+              <h3 class="text-white font-bold text-sm mb-1">${perfume.brand}</h3>
+              <p class="text-gray-400 text-xs">${perfume.name}</p>
+            </div>
+          </div>
+        `;
+      }).join('');
+      
+      // Aplicar colores dinámicos a los iconos
+      grid.querySelectorAll('.perfume-item').forEach(item => {
+        const color = item.dataset.color;
+        const colorClass = color.split(' ')[0].replace('from-', '');
+        
+        // Mapeo de colores Tailwind a colores hexadecimales
+        const colorMap = {
+          'yellow-700': '#a16207', 'yellow-800': '#854d0e',
+          'amber-700': '#b45309', 'amber-800': '#92400e', 'amber-900': '#78350f', 'amber-600': '#d97706',
+          'orange-700': '#c2410c', 'orange-800': '#9a3412', 'orange-900': '#7c2d12', 'orange-500': '#f97316',
+          'red-700': '#b91c1c', 'red-800': '#991b1b', 'red-900': '#7f1d1d',
+          'blue-700': '#1d4ed8', 'blue-800': '#1e40af', 'blue-900': '#1e3a8a', 'blue-600': '#2563eb',
+          'indigo-700': '#4338ca', 'indigo-800': '#3730a3', 'indigo-900': '#312e81',
+          'cyan-600': '#0891b2', 'cyan-700': '#0e7490', 'cyan-800': '#155e75', 'cyan-900': '#164e63', 'cyan-400': '#22d3ee',
+          'sky-400': '#38bdf8', 'sky-600': '#0284c7', 'sky-700': '#0369a1',
+          'teal-700': '#0f766e', 'teal-900': '#134e4a',
+          'emerald-900': '#064e3b', 'emerald-700': '#047857', 'emerald-600': '#059669',
+          'green-600': '#16a34a', 'green-700': '#15803d',
+          'purple-800': '#6b21a8', 'purple-900': '#581c87',
+          'violet-800': '#5b21b6',
+          'pink-800': '#9f1239', 'pink-900': '#831843', 'pink-500': '#ec4899',
+          'rose-500': '#f43f5e', 'rose-800': '#9f1239', 'rose-900': '#881337',
+          'slate-600': '#475569', 'slate-700': '#334155', 'slate-800': '#1e293b', 'slate-900': '#0f172a', 'slate-950': '#020617', 'slate-500': '#64748b',
+          'gray-300': '#d1d5db', 'gray-400': '#9ca3af', 'gray-500': '#6b7280', 'gray-700': '#374151', 'gray-800': '#1f2937', 'gray-900': '#111827',
+          'zinc-600': '#52525b', 'zinc-700': '#3f3f46',
+          'black': '#000000',
+          'brown-900': '#451a03'
+        };
+        
+        const bgColor = colorMap[colorClass] || '#10b981';
+        
+        if (item.classList.contains('owned')) {
+          const style = document.createElement('style');
+          style.textContent = `[data-perfume-id="${item.dataset.perfumeId}"].owned::after { background: ${bgColor}; box-shadow: 0 2px 8px ${bgColor}80; }`;
+          document.head.appendChild(style);
+        }
+        
+        if (item.classList.contains('wishlist')) {
+          const style = document.createElement('style');
+          style.textContent = `[data-perfume-id="${item.dataset.perfumeId}"].wishlist::after { background: ${bgColor}; box-shadow: 0 2px 8px ${bgColor}80; }`;
+          document.head.appendChild(style);
+        }
+        
+        if (item.classList.contains('fake')) {
+          const style = document.createElement('style');
+          style.textContent = `[data-perfume-id="${item.dataset.perfumeId}"].fake::before { background: ${bgColor}; box-shadow: 0 2px 8px ${bgColor}80; }`;
+          document.head.appendChild(style);
+        }
+        
+        item.addEventListener('click', () => {
+          const perfumeId = item.dataset.perfumeId;
+          openDetailModal(perfumeId);
+        });
+      });
+    }
+
+    function renderCollection() {
+      const ownedPerfumes = userPerfumes.filter(p => p.owned || p.is_fake);
+      const grid = document.getElementById('collection-grid');
+      const empty = document.getElementById('collection-empty');
+      
+      if (ownedPerfumes.length === 0) {
+        grid.innerHTML = '';
+        empty.classList.remove('hidden');
+        return;
+      }
+      
+      empty.classList.add('hidden');
+      grid.innerHTML = ownedPerfumes.map(userData => {
+        const perfume = PERFUME_CATALOG.find(p => p.id === userData.perfume_id);
+        if (!perfume) return '';
+        
+        let classes = 'perfume-item';
+        if (userData.owned) classes += ' owned';
+        if (userData.is_fake) classes += ' fake';
+        
+        return `
+          <div class="${classes} rounded-lg overflow-hidden cursor-pointer" data-perfume-id="${perfume.id}" data-color="${perfume.color}">
+            <div class="h-40 bg-gradient-to-br ${perfume.color} flex items-center justify-center">
+              ${perfume.svg}
+            </div>
+            <div class="p-3" style="background: #1a1a1a;">
+              <h3 class="text-white font-bold text-sm mb-1">${perfume.brand}</h3>
+              <p class="text-gray-400 text-xs">${perfume.name}</p>
+              ${userData.my_rating ? `<div class="text-amber-400 text-xs mt-1">${'★'.repeat(userData.my_rating)}</div>` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+      
+      grid.querySelectorAll('.perfume-item').forEach(item => {
+        const color = item.dataset.color;
+        const colorClass = color.split(' ')[0].replace('from-', '');
+        
+        const colorMap = {
+          'yellow-700': '#a16207', 'yellow-800': '#854d0e',
+          'amber-700': '#b45309', 'amber-800': '#92400e', 'amber-900': '#78350f', 'amber-600': '#d97706',
+          'orange-700': '#c2410c', 'orange-800': '#9a3412', 'orange-900': '#7c2d12', 'orange-500': '#f97316',
+          'red-700': '#b91c1c', 'red-800': '#991b1b', 'red-900': '#7f1d1d',
+          'blue-700': '#1d4ed8', 'blue-800': '#1e40af', 'blue-900': '#1e3a8a', 'blue-600': '#2563eb',
+          'indigo-700': '#4338ca', 'indigo-800': '#3730a3', 'indigo-900': '#312e81',
+          'cyan-600': '#0891b2', 'cyan-700': '#0e7490', 'cyan-800': '#155e75', 'cyan-900': '#164e63', 'cyan-400': '#22d3ee',
+          'sky-400': '#38bdf8', 'sky-600': '#0284c7', 'sky-700': '#0369a1',
+          'teal-700': '#0f766e', 'teal-900': '#134e4a',
+          'emerald-900': '#064e3b', 'emerald-700': '#047857', 'emerald-600': '#059669',
+          'green-600': '#16a34a', 'green-700': '#15803d',
+          'purple-800': '#6b21a8', 'purple-900': '#581c87',
+          'violet-800': '#5b21b6',
+          'pink-800': '#9f1239', 'pink-900': '#831843', 'pink-500': '#ec4899',
+          'rose-500': '#f43f5e', 'rose-800': '#9f1239', 'rose-900': '#881337',
+          'slate-600': '#475569', 'slate-700': '#334155', 'slate-800': '#1e293b', 'slate-900': '#0f172a', 'slate-950': '#020617', 'slate-500': '#64748b',
+          'gray-300': '#d1d5db', 'gray-400': '#9ca3af', 'gray-500': '#6b7280', 'gray-700': '#374151', 'gray-800': '#1f2937', 'gray-900': '#111827',
+          'zinc-600': '#52525b', 'zinc-700': '#3f3f46',
+          'black': '#000000',
+          'brown-900': '#451a03'
+        };
+        
+        const bgColor = colorMap[colorClass] || '#10b981';
+        
+        if (item.classList.contains('owned')) {
+          const style = document.createElement('style');
+          style.textContent = `[data-perfume-id="${item.dataset.perfumeId}"].owned::after { background: ${bgColor}; box-shadow: 0 2px 8px ${bgColor}80; }`;
+          document.head.appendChild(style);
+        }
+        
+        if (item.classList.contains('fake')) {
+          const style = document.createElement('style');
+          style.textContent = `[data-perfume-id="${item.dataset.perfumeId}"].fake::before { background: ${bgColor}; box-shadow: 0 2px 8px ${bgColor}80; }`;
+          document.head.appendChild(style);
+        }
+        
+        item.addEventListener('click', () => {
+          const perfumeId = item.dataset.perfumeId;
+          openDetailModal(perfumeId);
+        });
+      });
+    }
+
+    function renderWishlist() {
+      const wishlistPerfumes = userPerfumes.filter(p => p.wishlist && !p.owned);
+      const grid = document.getElementById('wishlist-grid');
+      const empty = document.getElementById('wishlist-empty');
+      
+      if (wishlistPerfumes.length === 0) {
+        grid.innerHTML = '';
+        empty.classList.remove('hidden');
+        return;
+      }
+      
+      empty.classList.add('hidden');
+      grid.innerHTML = wishlistPerfumes.map(userData => {
+        const perfume = PERFUME_CATALOG.find(p => p.id === userData.perfume_id);
+        if (!perfume) return '';
+        
+        return `
+          <div class="perfume-item wishlist rounded-lg overflow-hidden cursor-pointer" data-perfume-id="${perfume.id}" data-color="${perfume.color}">
+            <div class="h-40 bg-gradient-to-br ${perfume.color} flex items-center justify-center">
+              ${perfume.svg}
+            </div>
+            <div class="p-3" style="background: #1a1a1a;">
+              <h3 class="text-white font-bold text-sm mb-1">${perfume.brand}</h3>
+              <p class="text-gray-400 text-xs">${perfume.name}</p>
+            </div>
+          </div>
+        `;
+      }).join('');
+      
+      grid.querySelectorAll('.perfume-item').forEach(item => {
+        const color = item.dataset.color;
+        const colorClass = color.split(' ')[0].replace('from-', '');
+        
+        const colorMap = {
+          'yellow-700': '#a16207', 'yellow-800': '#854d0e',
+          'amber-700': '#b45309', 'amber-800': '#92400e', 'amber-900': '#78350f', 'amber-600': '#d97706',
+          'orange-700': '#c2410c', 'orange-800': '#9a3412', 'orange-900': '#7c2d12', 'orange-500': '#f97316',
+          'red-700': '#b91c1c', 'red-800': '#991b1b', 'red-900': '#7f1d1d',
+          'blue-700': '#1d4ed8', 'blue-800': '#1e40af', 'blue-900': '#1e3a8a', 'blue-600': '#2563eb',
+          'indigo-700': '#4338ca', 'indigo-800': '#3730a3', 'indigo-900': '#312e81',
+          'cyan-600': '#0891b2', 'cyan-700': '#0e7490', 'cyan-800': '#155e75', 'cyan-900': '#164e63', 'cyan-400': '#22d3ee',
+          'sky-400': '#38bdf8', 'sky-600': '#0284c7', 'sky-700': '#0369a1',
+          'teal-700': '#0f766e', 'teal-900': '#134e4a',
+          'emerald-900': '#064e3b', 'emerald-700': '#047857', 'emerald-600': '#059669',
+          'green-600': '#16a34a', 'green-700': '#15803d',
+          'purple-800': '#6b21a8', 'purple-900': '#581c87',
+          'violet-800': '#5b21b6',
+          'pink-800': '#9f1239', 'pink-900': '#831843', 'pink-500': '#ec4899',
+          'rose-500': '#f43f5e', 'rose-800': '#9f1239', 'rose-900': '#881337',
+          'slate-600': '#475569', 'slate-700': '#334155', 'slate-800': '#1e293b', 'slate-900': '#0f172a', 'slate-950': '#020617', 'slate-500': '#64748b',
+          'gray-300': '#d1d5db', 'gray-400': '#9ca3af', 'gray-500': '#6b7280', 'gray-700': '#374151', 'gray-800': '#1f2937', 'gray-900': '#111827',
+          'zinc-600': '#52525b', 'zinc-700': '#3f3f46',
+          'black': '#000000',
+          'brown-900': '#451a03'
+        };
+        
+        const bgColor = colorMap[colorClass] || '#f59e0b';
+        
+        if (item.classList.contains('wishlist')) {
+          const style = document.createElement('style');
+          style.textContent = `[data-perfume-id="${item.dataset.perfumeId}"].wishlist::after { background: ${bgColor}; box-shadow: 0 2px 8px ${bgColor}80; }`;
+          document.head.appendChild(style);
+        }
+        
+        item.addEventListener('click', () => {
+          const perfumeId = item.dataset.perfumeId;
+          openDetailModal(perfumeId);
+        });
+      });
+    }
+
+    function updateStats() {
+      const owned = userPerfumes.filter(p => p.owned).length;
+      const wishlist = userPerfumes.filter(p => p.wishlist && !p.owned).length;
+      const fake = userPerfumes.filter(p => p.is_fake).length;
+      
+      document.getElementById('header-stat-owned').textContent = owned;
+      document.getElementById('header-stat-wishlist').textContent = wishlist;
+      document.getElementById('sidebar-stat-owned').textContent = owned;
+      document.getElementById('sidebar-stat-wishlist').textContent = wishlist;
+      document.getElementById('sidebar-stat-fake').textContent = fake;
+    }
+
+    function openDetailModal(perfumeId) {
+      const perfume = PERFUME_CATALOG.find(p => p.id === perfumeId);
+      if (!perfume) return;
+      
+      selectedPerfume = perfume;
+      const userData = userPerfumes.find(p => p.perfume_id === perfumeId);
+      
+      document.getElementById('detail-brand').textContent = perfume.brand;
+      document.getElementById('detail-name').textContent = perfume.name;
+      document.getElementById('detail-image').innerHTML = perfume.svg;
+      document.getElementById('detail-image').className = `w-full h-64 rounded-lg mb-6 flex items-center justify-center bg-gradient-to-br ${perfume.color}`;
+      
+      if (userData) {
+        document.getElementById('detail-owned').checked = userData.owned;
+        document.getElementById('detail-wishlist').checked = userData.wishlist;
+        document.getElementById('detail-fake').checked = userData.is_fake;
+        document.getElementById('detail-review').value = userData.my_review || '';
+        selectedRating = userData.my_rating || 0;
+      } else {
+        document.getElementById('detail-owned').checked = false;
+        document.getElementById('detail-wishlist').checked = false;
+        document.getElementById('detail-fake').checked = false;
+        document.getElementById('detail-review').value = '';
+        selectedRating = 0;
+      }
+      
+      updateStarDisplay();
+      updateCheckboxStyles();
+      document.getElementById('detail-modal').classList.add('active');
+    }
+
+    function closeDetailModal() {
+      document.getElementById('detail-modal').classList.remove('active');
+      selectedPerfume = null;
+    }
+
+    function updateStarDisplay() {
+      document.querySelectorAll('#detail-rating-stars .star').forEach((star, index) => {
+        if (index < selectedRating) {
+          star.classList.add('filled');
+        } else {
+          star.classList.remove('filled');
+        }
+      });
+    }
+
+    function updateCheckboxStyles() {
+      const ownedChecked = document.getElementById('detail-owned').checked;
+      const wishlistChecked = document.getElementById('detail-wishlist').checked;
+      const fakeChecked = document.getElementById('detail-fake').checked;
+      
+      const ownedBtn = document.querySelector('#detail-owned-btn > div');
+      const wishlistBtn = document.querySelector('#detail-wishlist-btn > div');
+      const fakeBtn = document.querySelector('#detail-fake-btn > div');
+      
+      if (ownedChecked) {
+        ownedBtn.style.background = '#10b981';
+        ownedBtn.style.borderColor = '#10b981';
+        ownedBtn.style.color = '#ffffff';
+      } else {
+        ownedBtn.style.background = '#0f0f0f';
+        ownedBtn.style.borderColor = '#333';
+        ownedBtn.style.color = '#888';
+      }
+      
+      if (wishlistChecked) {
+        wishlistBtn.style.background = '#f59e0b';
+        wishlistBtn.style.borderColor = '#f59e0b';
+        wishlistBtn.style.color = '#ffffff';
+      } else {
+        wishlistBtn.style.background = '#0f0f0f';
+        wishlistBtn.style.borderColor = '#333';
+        wishlistBtn.style.color = '#888';
+      }
+      
+      if (fakeChecked) {
+        fakeBtn.style.background = '#ef4444';
+        fakeBtn.style.borderColor = '#ef4444';
+        fakeBtn.style.color = '#ffffff';
+      } else {
+        fakeBtn.style.background = '#0f0f0f';
+        fakeBtn.style.borderColor = '#333';
+        fakeBtn.style.color = '#888';
+      }
+    }
+
+    async function saveDetailChanges() {
+      if (!selectedPerfume) return;
+      
+      const saveBtn = document.getElementById('save-detail-btn');
+      const originalText = saveBtn.textContent;
+      saveBtn.innerHTML = 'GUARDANDO... <span class="loading-spinner"></span>';
+      saveBtn.disabled = true;
+      
+      const owned = document.getElementById('detail-owned').checked;
+      const wishlist = document.getElementById('detail-wishlist').checked;
+      const fake = document.getElementById('detail-fake').checked;
+      const review = document.getElementById('detail-review').value;
+      
+      const existingData = userPerfumes.find(p => p.perfume_id === selectedPerfume.id);
+      
+      if (userPerfumes.length >= 999 && !existingData) {
+        showToast('Límite alcanzado: máximo 999 perfumes', 'error');
+        saveBtn.textContent = originalText;
+        saveBtn.disabled = false;
+        return;
+      }
+      
+      const perfumeData = {
+        perfume_id: selectedPerfume.id,
+        owned: owned,
+        wishlist: wishlist,
+        is_fake: fake,
+        my_rating: selectedRating,
+        my_review: review,
+        created_at: new Date().toISOString()
+      };
+      
+      let result;
+      if (existingData) {
+        result = await window.dataSdk.update({ ...existingData, ...perfumeData });
+      } else {
+        result = await window.dataSdk.create(perfumeData);
+      }
+      
+      if (result.isOk) {
+        showToast('Cambios guardados correctamente');
+        closeDetailModal();
+      } else {
+        showToast('Error al guardar los cambios', 'error');
+      }
+      
+      saveBtn.textContent = originalText;
+      saveBtn.disabled = false;
+    }
+
+    function showToast(message, type = 'success') {
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      toast.style.background = type === 'error' ? '#ef4444' : '#10b981';
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      
+      setTimeout(() => {
+        toast.remove();
+      }, 3000);
+    }
+
+    initializeApp();
+  </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9c6065fdf0a7a431',t:'MTc2OTc3MDEyMi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
