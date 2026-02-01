@@ -246,6 +246,39 @@
       </div>
      </div>
     </header>
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+  <div class="p-4 rounded-lg flex flex-col md:flex-row gap-3 md:items-center md:justify-between"
+       style="background:#1a1a1a; border:1px solid #333;">
+    <div id="auth-logged-out" class="flex flex-col md:flex-row gap-3 md:items-center w-full">
+      <input id="auth-email" type="email" placeholder="Email"
+        class="w-full md:w-72 px-4 py-3 rounded-lg text-white"
+        style="background:#0f0f0f; border:1px solid #333;" />
+      <input id="auth-password" type="password" placeholder="Contraseña"
+        class="w-full md:w-72 px-4 py-3 rounded-lg text-white"
+        style="background:#0f0f0f; border:1px solid #333;" />
+      <div class="flex gap-3">
+        <button id="btn-signup"
+          class="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-5 py-3 rounded-lg font-bold hover:opacity-90">
+          Registrarme
+        </button>
+        <button id="btn-login"
+          class="bg-gray-700 text-white px-5 py-3 rounded-lg font-bold hover:bg-gray-600">
+          Entrar
+        </button>
+      </div>
+    </div>
+
+    <div id="auth-logged-in" class="hidden w-full flex items-center justify-between">
+      <div class="text-gray-300">
+        Conectado como <span id="auth-user-email" class="text-white font-semibold"></span>
+      </div>
+      <button id="btn-logout"
+        class="bg-gray-700 text-white px-5 py-3 rounded-lg font-bold hover:bg-gray-600">
+        Cerrar sesión
+      </button>
+    </div>
+  </div>
+</div>
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8"><!-- Catalog View (Default) -->
      <div id="catalog-view" class="view-content">
       <div class="mb-8">
@@ -864,7 +897,88 @@
       gradient: 'from-purple-600 to-pink-600',
       is_public: true
     };
-    
+
+    const supabase = window.supabaseClient;
+let currentUser = null;
+
+async function refreshAuthUI() {
+  const { data: { user } } = await supabase.auth.getUser();
+  currentUser = user || null;
+
+  const out = document.getElementById('auth-logged-out');
+  const inn = document.getElementById('auth-logged-in');
+  const emailSpan = document.getElementById('auth-user-email');
+
+  if (!out || !inn) return;
+
+  if (currentUser) {
+    out.classList.add('hidden');
+    inn.classList.remove('hidden');
+    emailSpan.textContent = currentUser.email || '';
+  } else {
+    inn.classList.add('hidden');
+    out.classList.remove('hidden');
+  }
+}
+
+async function setupAuth() {
+  document.getElementById('btn-signup')?.addEventListener('click', async () => {
+    const email = document.getElementById('auth-email').value.trim();
+    const password = document.getElementById('auth-password').value.trim();
+    const { error } = await supabase.auth.signUp({ email, password });
+    if (error) return showToast(error.message, 'error');
+    showToast('Registro OK. Revisa tu correo y confirma el email.');
+  });
+
+  document.getElementById('btn-login')?.addEventListener('click', async () => {
+    const email = document.getElementById('auth-email').value.trim();
+    const password = document.getElementById('auth-password').value.trim();
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) return showToast(error.message, 'error');
+    showToast('Sesión iniciada');
+    await refreshAuthUI();
+    await loadUserDataFromSupabase(); // 👈 lo haremos en el paso 3
+  });
+
+  document.getElementById('btn-logout')?.addEventListener('click', async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) return showToast(error.message, 'error');
+    showToast('Sesión cerrada');
+    currentUser = null;
+    userPerfumes = [];
+    await refreshAuthUI();
+    updateStats();
+    renderCurrentView();
+  });
+
+  supabase.auth.onAuthStateChange(async () => {
+    await refreshAuthUI();
+  });
+
+  await refreshAuthUI();
+}
+
+async function loadUserDataFromSupabase() {
+  if (!currentUser) return;
+
+  const { data, error } = await supabase
+    .from('user_perfumes')
+    .select('*')
+    .eq('user_id', currentUser.id);
+
+  if (error) {
+    console.error(error);
+    showToast('Error cargando datos', 'error');
+    return;
+  }
+
+  userPerfumes = data || [];
+  updateStats();
+  renderCurrentView();
+}
+
+
+   
     // Base de datos simulada de amigos
     const FRIENDS_DATABASE = [
       { id: 'perfume_master', name: '@perfume_master', bio: 'Coleccionista experto', avatar: '👨‍💼', gradient: 'from-purple-600 to-pink-600', perfumes: ['dior-sauvage', 'chanel-bleu', 'creed-aventus', 'paco-1million', 'jean-paul', 'armani-code', 'versace-eros', 'ysl-y', 'dior-homme', 'tom-ford-noir'], wishlist: ['creed-viking', 'tom-ford-tobacco', 'bvlgari-man'] },
@@ -919,70 +1033,19 @@
       });
     }
 
-    async function initializeApp() {
-      if (window.dataSdk) {
-        const initResult = await window.dataSdk.init(dataHandler);
-        if (!initResult.isOk) {
-          console.error("Error al inicializar Data SDK");
-        }
-      }
-      
-      if (window.elementSdk) {
-        window.elementSdk.init({
-          defaultConfig,
-          onConfigChange,
-          mapToCapabilities: (config) => ({
-            recolorables: [
-              {
-                get: () => config.background_color || defaultConfig.background_color,
-                set: (value) => {
-                  config.background_color = value;
-                  window.elementSdk.setConfig({ background_color: value });
-                }
-              },
-              {
-                get: () => config.surface_color || defaultConfig.surface_color,
-                set: (value) => {
-                  config.surface_color = value;
-                  window.elementSdk.setConfig({ surface_color: value });
-                }
-              },
-              {
-                get: () => config.text_color || defaultConfig.text_color,
-                set: (value) => {
-                  config.text_color = value;
-                  window.elementSdk.setConfig({ text_color: value });
-                }
-              },
-              {
-                get: () => config.primary_action_color || defaultConfig.primary_action_color,
-                set: (value) => {
-                  config.primary_action_color = value;
-                  window.elementSdk.setConfig({ primary_action_color: value });
-                }
-              },
-              {
-                get: () => config.secondary_action_color || defaultConfig.secondary_action_color,
-                set: (value) => {
-                  config.secondary_action_color = value;
-                  window.elementSdk.setConfig({ secondary_action_color: value });
-                }
-              }
-            ],
-            borderables: [],
-            fontEditable: undefined,
-            fontSizeable: undefined
-          }),
-          mapToEditPanelValues: (config) => new Map([
-            ["app_title", config.app_title || defaultConfig.app_title],
-            ["news_title", config.news_title || defaultConfig.news_title]
-          ])
-        });
-      }
-      
-      setupEventListeners();
-      renderCatalog();
-    }
+async function initializeApp() {
+  if (window.dataSdk) {
+    const initResult = await window.dataSdk.init(dataHandler);
+    if (!initResult.isOk) console.error("Error al inicializar Data SDK");
+  }
+
+  await setupAuth();
+  if (currentUser) await loadUserDataFromSupabase();
+
+  setupEventListeners();
+  renderCatalog();
+}
+
 
     function setupEventListeners() {
       document.getElementById('menu-btn').addEventListener('click', () => {
@@ -1946,5 +2009,6 @@
   </script>
 
 </html>
+
 
 
