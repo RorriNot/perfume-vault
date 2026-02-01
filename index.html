@@ -1023,12 +1023,16 @@ window.dataSdk = {
       gradient: 'from-purple-600 to-pink-600',
       is_public: true
     };
-
-    const supabase = window.supabaseClient;
 let currentUser = null;
 
+// Helper para no repetir window.supabaseClient y además validar
+function sb() {
+  if (!window.supabaseClient) throw new Error("Supabase client no inicializado");
+  return window.supabaseClient;
+}
+   
 async function refreshAuthUI() {
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await sb().auth.getUser();
   currentUser = user || null;
 
   const out = document.getElementById('auth-logged-out');
@@ -1051,24 +1055,30 @@ async function setupAuth() {
   document.getElementById('btn-signup')?.addEventListener('click', async () => {
     const email = document.getElementById('auth-email').value.trim();
     const password = document.getElementById('auth-password').value.trim();
-    const { error } = await supabase.auth.signUp({ email, password });
+
+    const { error } = await sb().auth.signUp({ email, password });
     if (error) return showToast(error.message, 'error');
+
     showToast('Registro OK. Revisa tu correo y confirma el email.');
+    await refreshAuthUI();
   });
 
   document.getElementById('btn-login')?.addEventListener('click', async () => {
     const email = document.getElementById('auth-email').value.trim();
     const password = document.getElementById('auth-password').value.trim();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+
+    const { error } = await sb().auth.signInWithPassword({ email, password });
     if (error) return showToast(error.message, 'error');
+
     showToast('Sesión iniciada');
     await refreshAuthUI();
-    const initResult = await window.dataSdk.init(dataHandler);
+    await window.dataSdk.init(dataHandler);
   });
 
   document.getElementById('btn-logout')?.addEventListener('click', async () => {
-    const { error } = await supabase.auth.signOut();
+    const { error } = await sb().auth.signOut();
     if (error) return showToast(error.message, 'error');
+
     showToast('Sesión cerrada');
     currentUser = null;
     userPerfumes = [];
@@ -1077,7 +1087,7 @@ async function setupAuth() {
     renderCurrentView();
   });
 
-  supabase.auth.onAuthStateChange(async () => {
+  sb().auth.onAuthStateChange(async () => {
     await refreshAuthUI();
   });
 
@@ -1087,7 +1097,7 @@ async function setupAuth() {
 async function loadUserDataFromSupabase() {
   if (!currentUser) return;
 
-  const { data, error } = await supabase
+  const { data, error } = await sb()
     .from('user_perfumes')
     .select('*')
     .eq('user_id', currentUser.id);
@@ -1102,7 +1112,6 @@ async function loadUserDataFromSupabase() {
   updateStats();
   renderCurrentView();
 }
-
 
    
     // Base de datos simulada de amigos
@@ -2135,6 +2144,7 @@ async function initializeApp() {
   </script>
 
 </html>
+
 
 
 
