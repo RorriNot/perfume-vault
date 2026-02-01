@@ -636,44 +636,170 @@
   }
 
   // Simula el SDK que tu código ya usa: init/create/update
-  window.dataSdk = {
-    _handler: null,
+window.dataSdk = {
+  _handler: null,
 
-    async init(handler) {
-      this._handler = handler;
-      const data = load();
-      handler.onDataChanged(data);
-      return { isOk: true };
-    },
+  async init(handler) {
+    this._handler = handler;
 
-    async create(record) {
-      const data = load();
-      const newRec = { ...record, id: record.id || crypto.randomUUID() };
-      data.push(newRec);
-      save(data);
-      this._handler?.onDataChanged(data);
-      return { isOk: true };
-    },
+    // Si hay login, cargamos desde Supabase, si no, desde localStorage
+    try {
+      const sb = window.supabaseClient;
+      const { data: { user } } = await sb.auth.getUser();
+      if (user) {
+        const { data, error } = await sb
+          .from('user_perfumes')
+          .select('*')
+          .eq('user_id', user.id);
 
-    async update(record) {
-      const data = load();
-
-      // buscamos por id si existe
-      let idx = record.id ? data.findIndex(r => r.id === record.id) : -1;
-
-      // si no hay id, intentamos emparejar por claves típicas de tu app
-      if (idx === -1 && record.perfume_id) idx = data.findIndex(r => r.perfume_id === record.perfume_id);
-      if (idx === -1 && record.friend_id) idx = data.findIndex(r => r.friend_id === record.friend_id);
-      if (idx === -1 && record.profile_username) idx = data.findIndex(r => r.profile_username);
-
-      if (idx >= 0) data[idx] = { ...data[idx], ...record };
-      else data.push({ ...record, id: record.id || crypto.randomUUID() });
-
-      save(data);
-      this._handler?.onDataChanged(data);
-      return { isOk: true };
+        if (error) throw error;
+        handler.onDataChanged(data || []);
+        return { isOk: true };
+      }
+    } catch (e) {
+      console.warn("Supabase init fallback local:", e);
     }
-  };
+
+    const data = load();
+    handler.onDataChanged(data);
+    return { isOk: true };
+  },
+
+  async create(record) {
+    // Si hay login: insert en Supabase
+    try {
+      const sb = window.supabaseClient;
+      const { data: { user } } = await sb.auth.getUser();
+      if (user) {
+        const payload = { ...record, user_id: user.id };
+
+        const { data, error } = await sb
+          .from('user_perfumes')
+          .insert(payload)
+          .select();
+
+        if (error) throw error;
+
+        // refrescamos el estado local desde Supabase
+        const { data: all, error: e2 } = await sb
+          .from('user_perfumes')
+          .select('*')
+          .eq('user_id', user.id);
+
+        if (e2) throw e2;
+
+        this._handler?.onDataChanged(all || []);
+        return { isOk: true, data };
+      }
+    } catch (e) {
+      console.warn("Supabase create fallback local:", e);
+    }
+
+    // Sin login: localStorage
+    const data = load();
+    const newRec = { ...record, id: record.id || crypto.randomUUID() };
+    data.push(newRec);
+    save(data);
+    this._handler?.onDataChanged(data);
+    return { isOk: true };
+  },
+
+  async update(record) {
+    // Si hay login: upsert en Supabase (usa id si existe; si no, intentamos buscar por perfume_id/friend_id/profile_username)
+    try {
+      const sb = window.supabaseClient;
+      const { data: { user } } = await sb.auth.getUser();
+      if (user) {
+        const userId = user.id;
+
+        // Si no hay id, intentamos localizar el registro en Supabase
+        let existing = null;
+
+        if (record.id) {
+          const { data, error } = await sb
+            .from('user_perfumes')
+            .select('*')
+            .eq('user_id', userId)
+            .eq('id', record.id)
+            .maybeSingle();
+          if (error) throw error;
+          existing = data;
+        } else if (record.perfume_id) {
+          const { data, error } = await sb
+            .from('user_perfumes')
+            .select('*')
+            .eq('user_id', userId)
+            .eq('perfume_id', record.perfume_id)
+            .maybeSingle();
+          if (error) throw error;
+          existing = data;
+        } else if (record.friend_id) {
+          const { data, error } = await sb
+            .from('user_perfumes')
+            .select('*')
+            .eq('user_id', userId)
+            .eq('friend_id', record.friend_id)
+            .maybeSingle();
+          if (error) throw error;
+          existing = data;
+        } else if (record.profile_username) {
+          const { data, error } = await sb
+            .from('user_perfumes')
+            .select('*')
+            .eq('user_id', userId)
+            .not('profile_username', 'is', null)
+            .maybeSingle();
+          if (error) throw error;
+          existing = data;
+        }
+
+        // update si existe, insert si no
+        if (existing?.id) {
+          const { error } = await sb
+            .from('user_perfumes')
+            .update({ ...record, user_id: userId })
+            .eq('user_id', userId)
+            .eq('id', existing.id);
+
+          if (error) throw error;
+        } else {
+          const { error } = await sb
+            .from('user_perfumes')
+            .insert({ ...record, user_id: userId });
+
+          if (error) throw error;
+        }
+
+        // refrescamos estado local
+        const { data: all, error: e2 } = await sb
+          .from('user_perfumes')
+          .select('*')
+          .eq('user_id', userId);
+
+        if (e2) throw e2;
+
+        this._handler?.onDataChanged(all || []);
+        return { isOk: true };
+      }
+    } catch (e) {
+      console.warn("Supabase update fallback local:", e);
+    }
+
+    // Sin login: localStorage
+    const data = load();
+    let idx = record.id ? data.findIndex(r => r.id === record.id) : -1;
+    if (idx === -1 && record.perfume_id) idx = data.findIndex(r => r.perfume_id === record.perfume_id);
+    if (idx === -1 && record.friend_id) idx = data.findIndex(r => r.friend_id === record.friend_id);
+    if (idx === -1 && record.profile_username) idx = data.findIndex(r => r.profile_username);
+
+    if (idx >= 0) data[idx] = { ...data[idx], ...record };
+    else data.push({ ...record, id: record.id || crypto.randomUUID() });
+
+    save(data);
+    this._handler?.onDataChanged(data);
+    return { isOk: true };
+  }
+};
 
   // Por si tu código mira elementSdk (lo dejamos como “no-op”)
   window.elementSdk = {
@@ -937,7 +1063,7 @@ async function setupAuth() {
     if (error) return showToast(error.message, 'error');
     showToast('Sesión iniciada');
     await refreshAuthUI();
-    await loadUserDataFromSupabase(); // 👈 lo haremos en el paso 3
+    const initResult = await window.dataSdk.init(dataHandler);
   });
 
   document.getElementById('btn-logout')?.addEventListener('click', async () => {
@@ -2009,6 +2135,7 @@ async function initializeApp() {
   </script>
 
 </html>
+
 
 
 
