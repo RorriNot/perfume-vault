@@ -1087,22 +1087,25 @@ async function setupAuth() {
     renderCurrentView();
   });
 
-  sb().auth.onAuthStateChange(async () => {
-    await refreshAuthUI();
-    if (session?.user) {
+supabase.auth.onAuthStateChange(async (event, session) => {
+  await refreshAuthUI();
+
+  if (session?.user) {
     await window.dataSdk.init(dataHandler);
   } else {
-    // ✅ si no hay sesión, limpia datos
     userPerfumes = [];
     updateStats();
     renderCurrentView();
   }
 });
 
+
   await refreshAuthUI();
-  if (currentUser) {
+const { data: { session } } = await supabase.auth.getSession();
+if (session?.user) {
   await window.dataSdk.init(dataHandler);
 }
+
 }
 
 async function loadUserDataFromSupabase() {
@@ -2155,6 +2158,7 @@ async function initializeApp() {
   </script>
 
 </html>
+
 
 
 
