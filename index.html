@@ -1089,9 +1089,20 @@ async function setupAuth() {
 
   sb().auth.onAuthStateChange(async () => {
     await refreshAuthUI();
-  });
+    if (session?.user) {
+    await window.dataSdk.init(dataHandler);
+  } else {
+    // ✅ si no hay sesión, limpia datos
+    userPerfumes = [];
+    updateStats();
+    renderCurrentView();
+  }
+});
 
   await refreshAuthUI();
+  if (currentUser) {
+  await window.dataSdk.init(dataHandler);
+}
 }
 
 async function loadUserDataFromSupabase() {
@@ -2144,6 +2155,7 @@ async function initializeApp() {
   </script>
 
 </html>
+
 
 
 
