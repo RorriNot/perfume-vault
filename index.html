@@ -1185,16 +1185,10 @@ async function loadUserDataFromSupabase() {
     }
 
 async function initializeApp() {
-  if (window.dataSdk) {
-    const initResult = await window.dataSdk.init(dataHandler);
-    if (!initResult.isOk) console.error("Error al inicializar Data SDK");
-  }
-
   await setupAuth();
-  if (currentUser) await loadUserDataFromSupabase();
-
   setupEventListeners();
   renderCatalog();
+ renderCurrentView();
 }
 
 
@@ -2160,6 +2154,7 @@ async function initializeApp() {
   </script>
 
 </html>
+
 
 
 
