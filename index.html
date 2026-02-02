@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="es" class="h-full">
  <head>
@@ -645,9 +646,8 @@ window.dataSdk = {
     // Si hay login, cargamos desde Supabase, si no, desde localStorage
     try {
       const sb = window.supabaseClient;
-const { data: { session } } = await sb.auth.getSession();
-const user = session?.user || null;
-if (user) {
+      const { data: { user } } = await sb.auth.getUser();
+      if (user) {
         const { data, error } = await sb
           .from('user_perfumes')
           .select('*')
@@ -1035,9 +1035,8 @@ function sb() {
 }
    
 async function refreshAuthUI() {
-  const { data: { session } } = await sb().auth.getSession();
-  const user = session?.user || null;
-  currentUser = user;
+  const { data: { user } } = await sb().auth.getUser();
+  currentUser = user || null;
 
   const out = document.getElementById('auth-logged-out');
   const inn = document.getElementById('auth-logged-in');
@@ -1054,7 +1053,6 @@ async function refreshAuthUI() {
     out.classList.remove('hidden');
   }
 }
-
 
 async function setupAuth() {
   document.getElementById('btn-signup')?.addEventListener('click', async () => {
@@ -1105,6 +1103,12 @@ sb().auth.onAuthStateChange(async (event, session) => {
 });
 
 await refreshAuthUI();
+
+const { data: { session } } = await sb().auth.getSession();
+if (session?.user) {
+  await window.dataSdk.init(dataHandler);
+}
+
 }
 
 async function loadUserDataFromSupabase() {
@@ -1182,18 +1186,16 @@ async function loadUserDataFromSupabase() {
     }
 
 async function initializeApp() {
-  try {
-    await setupAuth();
-
-    // IMPORTANTÍSIMO: cargar datos al inicio (supabase o local)
-    await window.dataSdk.init(dataHandler);
-
-    setupEventListeners();
-    renderCurrentView();
-  } catch (e) {
-    console.error("initializeApp:", e);
-    showToast("Error inicializando la app (mira consola)", "error");
+  if (window.dataSdk) {
+    const initResult = await window.dataSdk.init(dataHandler);
+    if (!initResult.isOk) console.error("Error al inicializar Data SDK");
   }
+
+  await setupAuth();
+  if (currentUser) await loadUserDataFromSupabase();
+
+  setupEventListeners();
+  renderCatalog();
 }
 
 
@@ -2159,7 +2161,6 @@ async function initializeApp() {
   </script>
 
 </html>
-
 
 
 
