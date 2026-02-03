@@ -77,54 +77,50 @@
       box-shadow: 0 15px 40px rgba(217, 70, 239, 0.4);
     }
     
-    .perfume-item.owned::after {
-      content: '✓';
-      position: absolute;
-      top: 8px;
-      right: 8px;
-      color: white;
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: bold;
-      font-size: 16px;
-    }
-    
-    .perfume-item.wishlist::after {
-      content: '★';
-      position: absolute;
-      top: 8px;
-      right: 8px;
-      color: white;
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: bold;
-      font-size: 16px;
-    }
-    
-    .perfume-item.fake::before {
-      content: '⚠';
-      position: absolute;
-      top: 8px;
-      left: 8px;
-      color: white;
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: bold;
-      font-size: 16px;
-      z-index: 10;
-    }
+/* ========= PERFUME BADGES (con CSS variables) ========= */
+
+.perfume-item.owned::after,
+.perfume-item.wishlist::after {
+  content: attr(data-badge);
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  color: white;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 16px;
+
+  /* 🔥 CLAVE DEL PARCHE */
+  background: var(--badge, #10b981);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--badge, #10b981), transparent 50%);
+}
+
+.perfume-item.fake::before {
+  content: '⚠';
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  color: white;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 16px;
+  z-index: 10;
+
+  /* 🔥 CLAVE DEL PARCHE */
+  background: var(--badge, #ef4444);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--badge, #ef4444), transparent 50%);
+}
+
     
     .star {
       cursor: pointer;
@@ -2161,6 +2157,7 @@ async function initializeApp() {
   </script>
 
 </html>
+
 
 
 
